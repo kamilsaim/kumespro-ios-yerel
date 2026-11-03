@@ -19,6 +19,8 @@ Sinerji 2.0'dan örnek alındı. Gizli depo: `kamilsaim/kumespro-ios-yerel`.
 - `dbYukle` ünite göçü → `Unite.init(satir:)`
 - `cikimBildirimleriKur` (3 bildirim, 08:00) → `bildirimPlani()`; `widgetGuncelle` → `widgetJSON`
 - `excelAl`, `yedekAl` (5.0-cloud) → `Disa.swift`
+- `yedekYukle` → `GeriYukle.swift` (`Yedek`, kimlik eşleme) + `Depo.yedekYukle`. Bilinçli fark: önce "Yedek öncesi" arşivi,
+  yedek satırları önce eklenir, eskiler sonra silinir (yarıda kalırsa eklenenler geri alınır); sezon arşivi silinmez.
 - Bilinçli fark: satış iadesinde ünitiye yazılan "ekle" kaydı `kalan: 0` taşır (web kalan'sız yazıyordu → web göçü
   bunu yeni parti sayıp stoğu ikiye katlayabiliyordu).
 
@@ -40,5 +42,5 @@ DIST_CERT_P12_BASE64, DIST_CERT_PASSWORD.
 - Temiz logo (1024, çerçevesiz, yazısız) ve tür başına ≥300 px şeffaf PNG gelince Assets'teki geçici görselleri değiştir.
 - `kp_apple_jeton`'a satır düştüğünü ve test Apple hesabıyla silmeyi doğrula.
 - Formlarda kaydedilmemiş değişiklikte kaydırarak kapatma onayı (HIG).
-- Yedek geri yükleme yalnız web'de.
+- Yedekten geri yükleme (Ayarlar) eklendi, henüz derlenmedi/cihazda denenmedi (4 Kas 2026).
 - Mağaza metni, inceleme notu (yerel uygulama: WidgetKit, yerel bildirim, Apple ile Giriş, paylaşım menüsü), ekran görüntüleri.

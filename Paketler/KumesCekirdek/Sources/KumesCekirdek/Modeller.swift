@@ -254,7 +254,7 @@ public struct Kulucka: Identifiable, Equatable, Sendable {
     public init(bellek r: JSONNesne) {
         var s = r
         s["not_"] = r["not"]
-        s["toplam_yumurta"] = r["toplamYumurta"]
+        s["toplam_yumurta"] = r["toplamYumurta"] ?? r["toplam_yumurta"]
         self.init(satir: s)
     }
 

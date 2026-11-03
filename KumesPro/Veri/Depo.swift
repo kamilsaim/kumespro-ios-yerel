@@ -378,6 +378,111 @@ final class Depo {
         try await supabase.from("sezonlar").insert(satir, returning: .minimal).execute()
     }
 
+    // MARK: Yedekten geri yükleme
+
+    private func kimlikler(_ tablo: String, _ uid: String) async throws -> [String] {
+        let r: [JSONNesne] = try await supabase.from(tablo).select("id").eq("user_id", value: uid).execute().value
+        return r.compactMap { $0.metin("id") }
+    }
+
+    private func topluEkle(_ tablo: String, _ satirlar: [JSONNesne], _ uid: String) async throws -> [String] {
+        var idler: [String] = []
+        var i = 0
+        while i < satirlar.count {
+            let parca = satirlar[i..<min(i + 200, satirlar.count)].map { s -> JSONNesne in
+                var s = s; s["user_id"] = .metin(uid); return s
+            }
+            let r: [JSONNesne] = try await supabase.from(tablo).insert(Array(parca), returning: .representation)
+                .select("id").execute().value
+            idler += r.compactMap { $0.metin("id") }
+            i += 200
+        }
+        return idler
+    }
+
+    private func idIleSil(_ tablo: String, _ idler: [String]) async throws {
+        var i = 0
+        while i < idler.count {
+            let parca = Array(idler[i..<min(i + 100, idler.count)])
+            try await supabase.from(tablo).delete(returning: .minimal).in("id", values: parca).execute()
+            i += 100
+        }
+    }
+
+    /// JSON yedeğini geri yükler (web `yedekYukle`). Web'den farkı, veri kaybına karşı:
+    ///  1) mevcut canlı veri önce "Yedek öncesi …" adıyla sezon arşivine alınır,
+    ///  2) yedek satırları ÖNCE eklenir, eski satırlar ancak hepsi eklendikten sonra silinir
+    ///     (ekleme yarıda kalırsa eklenenler geri alınır, mevcut veri olduğu gibi kalır),
+    ///  3) sezon arşivi silinmez; yedekteki arşivlerden olmayanlar eklenir.
+    /// Eklenen kayıt sayısını döner.
+    func yedekYukle(_ y: Yedek) async throws -> Int {
+        try yazilabilir()
+        guard let uid = kullanici else { throw KuralHatasi("Oturum bulunamadı.") }
+
+        do { try await arsivle(ad: "Yedek öncesi " + Gun.goster(Date())) } catch {
+            throw KuralHatasi("Mevcut veriler arşive kaydedilemedi, hiçbir şey değiştirilmedi.\n\(error.localizedDescription)")
+        }
+
+        let tablolar = ["giderler", "satislar", "kuluckalar", "civciv_uniteleri", "kumesler"]
+        var eski: [String: [String]] = [:]
+        for t in tablolar { eski[t] = try await kimlikler(t, uid) }
+
+        var v = y.veri
+        var eklenen: [(String, String)] = []
+        do {
+            var km: [String: String] = [:]
+            for i in v.kumesler.indices {
+                let yeni = try await ekle("kumesler", v.kumesler[i].satir)
+                eklenen.append(("kumesler", yeni))
+                km[v.kumesler[i].id] = yeni
+            }
+            v.kumesKimlikleriniEsle(km)
+
+            var um: [String: String] = [:]
+            if v.uniteler.isEmpty { v.uniteler = [Unite(ad: "Genel Civciv Ünitesi", tip: .civciv)] }
+            for i in v.uniteler.indices {
+                let yeni = try await ekle("civciv_uniteleri", v.uniteler[i].satir)
+                eklenen.append(("civciv_uniteleri", yeni))
+                um[v.uniteler[i].id] = yeni
+            }
+            v.uniteKimlikleriniEsle(um)
+
+            for (t, satirlar) in [("kuluckalar", v.kuluckalar.map(\.satir)), ("satislar", v.satislar.map(\.satir)),
+                                  ("giderler", v.giderler.map(\.satir))] {
+                for id in try await topluEkle(t, satirlar, uid) { eklenen.append((t, id)) }
+            }
+        } catch {
+            // Yarım kalan yüklemeyi geri al: önce bağımlı tablolar
+            for t in tablolar {
+                let ids = eklenen.filter { $0.0 == t }.map(\.1)
+                if !ids.isEmpty { try? await idIleSil(t, ids) }
+            }
+            throw KuralHatasi("Yedek yüklenemedi, mevcut verilere dokunulmadı.\n\(error.localizedDescription)")
+        }
+
+        var silinemeyen = false
+        for t in tablolar {
+            do { try await idIleSil(t, eski[t] ?? []) } catch { silinemeyen = true }
+        }
+
+        // Sezon arşivi: yalnız eksik olanlar eklenir
+        await sezonlariYukle()
+        let varOlan = Set(sezonlar.map(\.id))
+        for s in y.sezonlar where !varOlan.contains(s.metin("id") ?? "") {
+            var satir: JSONNesne = ["id": s["id"] ?? .metin(yeniKimlik()), "user_id": .metin(uid),
+                                    "ad": .metin(s.metin("ad") ?? "Sezon"), "tarih": .metin(s.metin("tarih") ?? Gun.bugun)]
+            satir["veri"] = s["veri"] ?? .nesne([:])
+            try? await supabase.from("sezonlar").insert(satir, returning: .minimal).execute()
+        }
+
+        await yukle()
+        await sezonlariYukle()
+        if silinemeyen {
+            throw KuralHatasi("Yedek yüklendi ama eski kayıtların bir kısmı silinemedi; çift görünen kayıt olabilir. İnterneti kontrol edip uygulamayı yenileyin.")
+        }
+        return y.kayitSayisi
+    }
+
     /// Yeni sezon (web `yeniSezonOlustur`): arşivle, satış/gider ve tamamlanmış kuluçkaları sil.
     func yeniSezon(ad: String) async throws {
         try yazilabilir()

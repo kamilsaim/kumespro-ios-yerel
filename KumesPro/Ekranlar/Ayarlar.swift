@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import UserNotifications
 import KumesCekirdek
 
@@ -35,6 +36,9 @@ struct AyarlarEkrani: View {
     @State private var bekleyen = 0
     @State private var paylasim: PaylasimDosyasi?
     @State private var cikisOnay = false
+    @State private var dosyaSec = false
+    @State private var yuklenecek: Yedek?
+    @State private var geriYukleniyor = false
 
     var body: some View {
         let g = oturum.gorunum
@@ -72,8 +76,15 @@ struct AyarlarEkrani: View {
                     Menu {
                         ForEach(RaporTipi.allCases) { t in Button(t.ad) { excel(t) } }
                     } label: { Label("Excel (CSV) raporu", systemImage: "tablecells") }
+                    Button { dosyaSec = true } label: {
+                        HStack {
+                            Label("Yedekten geri yükle", systemImage: "arrow.counterclockwise.icloud")
+                            if geriYukleniyor { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(depo.saltOkunur || geriYukleniyor)
                 } header: { Text("Yedek ve rapor") } footer: {
-                    Text("Yedek dosyası web uygulamasındaki \"Yedek Yükle\" ile geri yüklenebilir.")
+                    Text("Geri yükleme mevcut verilerin yerine yedektekileri koyar; mevcut veriler önce sezon arşivine kaydedilir. Yedek dosyası web uygulamasında da kullanılabilir.")
                 }
 
                 Section {
@@ -111,6 +122,15 @@ struct AyarlarEkrani: View {
                     if tamam && p.yedek { Task { await oturum.yedekAlindi() } }
                 }
                 .presentationDetents([.medium, .large])
+            }
+            .fileImporter(isPresented: $dosyaSec, allowedContentTypes: [.json]) { sonuc in
+                do { yuklenecek = try yedekOku(sonuc.get()) } catch { gezinti.goster(error) }
+            }
+            .confirmationDialog("Yedek geri yüklensin mi?", isPresented: Binding(get: { yuklenecek != nil }, set: { if !$0 { yuklenecek = nil } }),
+                                titleVisibility: .visible, presenting: yuklenecek) { y in
+                Button("Evet, geri yükle", role: .destructive) { geriYukle(y) }
+            } message: { y in
+                Text(yedekOzeti(y))
             }
             .confirmationDialog("Çıkış yapılsın mı?", isPresented: $cikisOnay, titleVisibility: .visible) {
                 Button("Çıkış yap", role: .destructive) { kapat(); Task { await oturum.cikis() } }
@@ -191,10 +211,48 @@ struct AyarlarEkrani: View {
         }
     }
 
+    private func yedekOku(_ url: URL) throws -> Yedek {
+        let izin = url.startAccessingSecurityScopedResource()
+        defer { if izin { url.stopAccessingSecurityScopedResource() } }
+        return try Yedek(dosya: Data(contentsOf: url))
+    }
+
+    private func yedekOzeti(_ y: Yedek) -> String {
+        let v = y.veri
+        var m = ""
+        if let t = y.tarih, let d = ISO8601DateFormatter.kesirli.date(from: t) ?? ISO8601DateFormatter().date(from: t) {
+            m += "Yedek tarihi: \(Gun.goster(d))\n"
+        }
+        m += "\(v.kumesler.count) kümes, \(v.kuluckalar.count) kuluçka, \(v.uniteler.count) ünite, \(v.satislar.count) satış, \(v.giderler.count) gider"
+        if !y.sezonlar.isEmpty { m += ", \(y.sezonlar.count) sezon arşivi" }
+        m += ".\n\nMevcut kümes, kuluçka, ünite, satış ve giderlerin yerine bunlar geçecek. Mevcut veriler önce \"Yedek öncesi\" adıyla sezon arşivine kaydedilir."
+        return m
+    }
+
+    private func geriYukle(_ y: Yedek) {
+        geriYukleniyor = true
+        Task {
+            do {
+                let n = try await depo.yedekYukle(y)
+                kapat(); gezinti.sekme = .ozet
+                gezinti.mesaj = Mesaj(baslik: "Yedek yüklendi", metin: "\(n) kayıt geri yüklendi. Önceki veriler sezon arşivinde duruyor.")
+            } catch { gezinti.goster(error) }
+            geriYukleniyor = false
+        }
+    }
+
     private func excel(_ t: RaporTipi) {
         let r = depo.veri.csvRaporu(t)
         if let u = dosyaYaz(r.dosya, Data(r.icerik.utf8)) { paylasim = PaylasimDosyasi(url: u, yedek: false) }
     }
+}
+
+private extension ISO8601DateFormatter {
+    static let kesirli: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 }
 
 // MARK: - Sezon arşivi
