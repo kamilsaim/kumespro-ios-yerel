@@ -30,10 +30,10 @@ Derleme no = 100 + çalıştırma×10 + deneme. 5 secret: ASC_KEY_ID, ASC_ISSUER
 DIST_CERT_P12_BASE64, DIST_CERT_PASSWORD.
 
 ## Durum (3 Kas 2026)
-- 8.0 (111) TestFlight'ta; iPhone'da giriş (Apple/Google), widget, çıkım→ünite, satış→stok doğrulandı.
+- 8.0 (111) ilk derleme; iPhone'da giriş (Apple/Google), widget, çıkım→ünite, satış→stok doğrulandı.
 - Apple jeton iptali kuruldu: `apple-jeton` + `hesap-sil` + `kp_apple_jeton` (kaynaklar ana depoda `supabase/`, git dışı).
 
-- Yeni uygulama ikonu + giriş/açılış logosu + kümes kartlarında tür resimleri (geçici kaynaklardan, commit 2. derleme bekliyor).
+- 8.0 (133) TestFlight'ta: yeni uygulama ikonu + giriş/açılış logosu + kümes kartlarında tür resimleri (geçici kaynaklardan).
 - macos-26 kuyruğu dolunca iş başlamadan ~15 dk sonra `cancelled` oluyor → `gh run rerun`.
 
 ## Açık işler
