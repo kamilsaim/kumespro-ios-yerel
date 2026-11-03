@@ -29,7 +29,12 @@ gh workflow run ios-testflight.yml -R kamilsaim/kumespro-ios-yerel -f surum=8.0
 Derleme no = 100 + çalıştırma×10 + deneme. 5 secret: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64,
 DIST_CERT_P12_BASE64, DIST_CERT_PASSWORD.
 
+## Durum (3 Kas 2026)
+- 8.0 (111) TestFlight'ta; iPhone'da giriş (Apple/Google), widget, çıkım→ünite, satış→stok doğrulandı.
+- Apple jeton iptali kuruldu: `apple-jeton` + `hesap-sil` + `kp_apple_jeton` (kaynaklar ana depoda `supabase/`, git dışı).
+
 ## Açık işler
-- Apple jeton iptali (App Store 5.1.1(v)): uygulama girişte `apple-jeton` Edge Function'ına yetki kodunu
-  gönderiyor; sunucu tarafı (fonksiyon + tablo + `hesap-sil`'de iptal) henüz kurulmadı.
+- `kp_apple_jeton`'a satır düştüğünü ve test Apple hesabıyla silmeyi doğrula.
+- Formlarda kaydedilmemiş değişiklikte kaydırarak kapatma onayı (HIG).
 - Yedek geri yükleme yalnız web'de.
+- Mağaza metni, inceleme notu (yerel uygulama: WidgetKit, yerel bildirim, Apple ile Giriş, paylaşım menüsü), ekran görüntüleri.
