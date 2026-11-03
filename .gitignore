@@ -1,0 +1,11 @@
+.build/
+*.xcodeproj/
+build/
+DerivedData/
+*.p12
+*.p8
+*.ipa
+*.dSYM.zip
+.DS_Store
+.swiftpm/
+.superpowers/

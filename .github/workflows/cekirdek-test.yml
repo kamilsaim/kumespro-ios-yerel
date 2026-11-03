@@ -1,0 +1,32 @@
+# KümesPro çekirdek paketi testleri — Linux'ta (ucuz), her push'ta.
+# macOS derlemesi ayrı ve yalnız elle tetiklenir (ios-testflight.yml).
+name: Cekirdek testleri
+
+on:
+  push:
+    paths:
+      - "Paketler/**"
+      - ".github/workflows/cekirdek-test.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        # bash = pipefail; yoksa `| tee` kırmızı testi yeşil gösterir
+        shell: bash
+        working-directory: Paketler/KumesCekirdek
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+      - name: swift test
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee test-cikti.txt
+      - name: Sonuc
+        if: always()
+        run: grep -E "Executed|error:|failed|passed" test-cikti.txt | tail -40 || true
