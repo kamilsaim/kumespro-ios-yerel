@@ -33,7 +33,11 @@ DIST_CERT_P12_BASE64, DIST_CERT_PASSWORD.
 - 8.0 (111) TestFlight'ta; iPhone'da giriş (Apple/Google), widget, çıkım→ünite, satış→stok doğrulandı.
 - Apple jeton iptali kuruldu: `apple-jeton` + `hesap-sil` + `kp_apple_jeton` (kaynaklar ana depoda `supabase/`, git dışı).
 
+- Yeni uygulama ikonu + giriş/açılış logosu + kümes kartlarında tür resimleri (geçici kaynaklardan, commit 2. derleme bekliyor).
+- macos-26 kuyruğu dolunca iş başlamadan ~15 dk sonra `cancelled` oluyor → `gh run rerun`.
+
 ## Açık işler
+- Temiz logo (1024, çerçevesiz, yazısız) ve tür başına ≥300 px şeffaf PNG gelince Assets'teki geçici görselleri değiştir.
 - `kp_apple_jeton`'a satır düştüğünü ve test Apple hesabıyla silmeyi doğrula.
 - Formlarda kaydedilmemiş değişiklikte kaydırarak kapatma onayı (HIG).
 - Yedek geri yükleme yalnız web'de.
