@@ -75,6 +75,20 @@ extension HayvanTuru {
         }
     }
 
+    /// Tür resmi (Assets: Tur-<ad>); "diğer" için yok → SF Symbol.
+    var resim: String? {
+        switch self {
+        case .tavuk, .karisik: return "Tur-tavuk"
+        case .guvercin: return "Tur-guvercin"
+        case .hindi: return "Tur-hindi"
+        case .kaz: return "Tur-kaz"
+        case .bildircin: return "Tur-bildircin"
+        case .keklik: return "Tur-keklik"
+        case .tavus: return "Tur-tavus"
+        case .diger: return nil
+        }
+    }
+
     var simge: String {
         switch self {
         case .guvercin: return "bird.fill"

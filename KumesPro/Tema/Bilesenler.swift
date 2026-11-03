@@ -34,6 +34,25 @@ struct IkonRozeti: View {
     }
 }
 
+/// Kümes türü rozeti: tür resmi varsa resim, yoksa renkli sembol.
+struct TurRozeti: View {
+    let tur: HayvanTuru
+    var boyut: CGFloat = 48
+
+    var body: some View {
+        if let r = tur.resim {
+            Image(r)
+                .resizable()
+                .scaledToFill()
+                .frame(width: boyut, height: boyut)
+                .clipShape(RoundedRectangle(cornerRadius: boyut * 0.28, style: .continuous))
+                .accessibilityHidden(true)
+        } else {
+            IkonRozeti(simge: tur.simge, renk: tur.renk, zemin: tur.zemin, boyut: boyut)
+        }
+    }
+}
+
 /// Küçük hap etiket.
 struct Hap: View {
     let yazi: String

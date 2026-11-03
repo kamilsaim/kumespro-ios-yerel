@@ -66,7 +66,7 @@ struct KumesKarti: View {
         Kart {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                    IkonRozeti(simge: t.simge, renk: t.renk, zemin: t.zemin, boyut: 48)
+                    TurRozeti(tur: t, boyut: 48)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(k.ad).font(.headline).foregroundStyle(Renk.metin).lineLimit(1)
                         HStack(spacing: 6) {
@@ -163,7 +163,7 @@ struct KumesDetay: View {
             List {
                 Section {
                     VStack(spacing: 10) {
-                        IkonRozeti(simge: t.simge, renk: t.renk, zemin: t.zemin, boyut: 64)
+                        TurRozeti(tur: t, boyut: 72)
                         Text("\(k.toplam)").font(.system(size: 44, weight: .bold).monospacedDigit())
                         Text("TOPLAM HAYVAN").font(.caption.weight(.bold)).foregroundStyle(Renk.ikincil).tracking(0.5)
                         HStack(spacing: 8) {

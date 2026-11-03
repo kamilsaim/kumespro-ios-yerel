@@ -69,9 +69,8 @@ struct GirisEkrani: View {
             Dalgalar().ignoresSafeArea()
             VStack(spacing: 0) {
                 Spacer()
-                Image("Logo").resizable().scaledToFit().frame(width: 120, height: 120)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 3))
+                Image("Logo").resizable().scaledToFit().frame(width: 132, height: 132)
+                    .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).stroke(.white.opacity(0.9), lineWidth: 3))
                     .shadow(color: .black.opacity(0.25), radius: 16, y: 8)
                     .accessibilityHidden(true)
                 Text("KümesPro").font(.logo(40)).foregroundStyle(.white).padding(.top, 20)

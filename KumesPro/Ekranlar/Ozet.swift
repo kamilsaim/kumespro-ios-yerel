@@ -24,7 +24,7 @@ struct OzetEkrani: View {
                     }
 
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                        SayiKarti(simge: "bird.fill", renk: Renk.mavi, zemin: Renk.maviAcik, deger: "\(v.toplamHayvan)",
+                        SayiKarti(simge: "bird.fill", renk: Renk.mavi, zemin: Renk.maviAcik, resim: "Tur-tavuk", deger: "\(v.toplamHayvan)",
                                   alt: "hayvan · \(v.toplamErkek) E · \(v.toplamDisi) D") { gezinti.sekme = .kumesler }
                         SayiKarti(simge: "oval.portrait.fill", renk: Renk.turuncuYazi, zemin: Renk.turuncuAcik,
                                   deger: "\(v.aktifKuluckalar.count)",
@@ -178,6 +178,7 @@ struct SayiKarti: View {
     let simge: String
     let renk: Color
     let zemin: Color
+    var resim: String? = nil
     let deger: String
     let alt: String
     var degerRenk: Color = Renk.metin
@@ -187,7 +188,12 @@ struct SayiKarti: View {
         Button(action: eylem) {
             Kart(dolgu: 14) {
                 VStack(alignment: .leading, spacing: 8) {
-                    IkonRozeti(simge: simge, renk: renk, zemin: zemin)
+                    if let resim {
+                        Image(resim).resizable().scaledToFill().frame(width: 36, height: 36)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous)).accessibilityHidden(true)
+                    } else {
+                        IkonRozeti(simge: simge, renk: renk, zemin: zemin)
+                    }
                     Text(deger).font(.title2.weight(.bold).monospacedDigit()).foregroundStyle(degerRenk)
                         .lineLimit(1).minimumScaleFactor(0.6)
                     Text(alt).font(.caption).foregroundStyle(Renk.ikincil).lineLimit(1).minimumScaleFactor(0.8)
