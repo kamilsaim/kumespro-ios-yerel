@@ -21,8 +21,7 @@ Sinerji 2.0'dan örnek alındı. Gizli depo: `kamilsaim/kumespro-ios-yerel`.
 - `excelAl`, `yedekAl` (5.0-cloud) → `Disa.swift`
 - `yedekYukle` → `GeriYukle.swift` (`Yedek`, kimlik eşleme) + `Depo.yedekYukle`. Bilinçli fark: önce "Yedek öncesi" arşivi,
   yedek satırları önce eklenir, eskiler sonra silinir (yarıda kalırsa eklenenler geri alınır); sezon arşivi silinmez.
-- Bilinçli fark: satış iadesinde ünitiye yazılan "ekle" kaydı `kalan: 0` taşır (web kalan'sız yazıyordu → web göçü
-  bunu yeni parti sayıp stoğu ikiye katlayabiliyordu).
+- Satış iadesinde üniteye yazılan "ekle" kaydı `kalan: 0` taşır (web 7.22'den beri aynı).
 
 ## Derleme (yalnız Kamil onay verince)
 ```
