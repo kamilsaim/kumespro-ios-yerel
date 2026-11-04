@@ -41,5 +41,5 @@ DIST_CERT_P12_BASE64, DIST_CERT_PASSWORD.
 - Temiz logo (1024, çerçevesiz, yazısız) ve tür başına ≥300 px şeffaf PNG gelince Assets'teki geçici görselleri değiştir.
 - `kp_apple_jeton`'a satır düştüğünü ve test Apple hesabıyla silmeyi doğrula.
 - Formlarda kaydedilmemiş değişiklikte kaydırarak kapatma onayı (HIG).
-- Yedekten geri yükleme (Ayarlar) eklendi, henüz derlenmedi/cihazda denenmedi (4 Kas 2026).
+- 8.0 (141) TestFlight'ta (4 Kas 2026): yedekten geri yükleme (Ayarlar) — iPhone'da denenecek.
 - Mağaza metni, inceleme notu (yerel uygulama: WidgetKit, yerel bildirim, Apple ile Giriş, paylaşım menüsü), ekran görüntüleri.
