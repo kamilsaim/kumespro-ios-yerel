@@ -29,6 +29,22 @@ private struct KokEkran: View {
 
     var body: some View {
         Group {
+            #if DEBUG && targetEnvironment(simulator)
+            if ProcessInfo.processInfo.arguments.contains("--kp-arayuz-testi") {
+                AnaKabuk()
+                    .overlay(alignment: .top) { Text("ÖRNEK VERİ").font(.caption2).padding(4).background(.ultraThinMaterial) }
+                    .task { depo.simulatorOrnegi() }
+            } else {
+                normalIcerik
+            }
+            #else
+            normalIcerik
+            #endif
+        }
+    }
+
+    private var normalIcerik: some View {
+        Group {
             if !oturum.hazir {
                 AcilisEkrani()
             } else if oturum.kullanici == nil {

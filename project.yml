@@ -17,10 +17,22 @@ packages:
     url: https://github.com/supabase/supabase-swift
     from: 2.0.0
 targets:
+  KumesProArayuzTests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [ArayuzTestleri]
+    dependencies:
+      - target: KumesPro
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kamilsaim.kumespro.arayuztests
+        GENERATE_INFOPLIST_FILE: YES
   KumesPro:
     type: application
     platform: iOS
-    scheme: {}
+    scheme:
+      testTargets:
+        - KumesProArayuzTests
     sources:
       - path: KumesPro
         excludes:

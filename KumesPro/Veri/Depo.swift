@@ -8,6 +8,19 @@ import KumesCekirdek
 /// kayıt başarılıysa ekrandaki veri güncellenir. Arşiv (sezon) görüntülenirken yazma kapalıdır.
 @Observable @MainActor
 final class Depo {
+    #if DEBUG && targetEnvironment(simulator)
+    func simulatorOrnegi() {
+        var k = Kumes(id: "qa-kumes", ad: "Örnek Brahma Kümesi", tur: "tavuk")
+        k.irklar = [Irk(ad: "Brahma", erkek: 8, disi: 40, id: "qa-irk")]
+        var g = Kumes(id: "qa-guvercin", ad: "Örnek Güvercinlik", tur: "guvercin")
+        g.irklar = [Irk(ad: "Taklacı", erkek: 12, disi: 14, id: "qa-irk2")]
+        let q = Kulucka(id: "qa-kulucka", ad: "Örnek kuluçka", baslangic: Gun.metin(Date()), sure: 21,
+                        kaynaklar: [YumurtaKaynagi(kumesId: k.id, adet: 24)])
+        veri = Veri(kumesler: [k,g], kuluckalar: [q])
+        yuklendi = true
+        hata = nil
+    }
+    #endif
     private(set) var veri = Veri()
     private(set) var yuklendi = false
     private(set) var yukleniyor = false
