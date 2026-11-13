@@ -10,8 +10,8 @@ struct KuluckaEkrani: View {
     var body: some View {
         let v = depo.veri
         let aktif = v.aktifKuluckalar.sorted { $0.durum().gecikme > $1.durum().gecikme }
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+        List {
+            Section {
                 Text("\(aktif.count) devam ediyor · \(v.biten.count) tamamlandı")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(Renk.ikincil)
                 if v.kuluckalar.isEmpty {
@@ -21,6 +21,16 @@ struct KuluckaEkrani: View {
                 }
                 ForEach(aktif) { k in
                     AktifKuluckaKarti(k: k, salt: depo.saltOkunur) { silinecek = k }
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            if !depo.saltOkunur {
+                                Button("Düzenle", systemImage: "pencil") { gezinti.ac(.kulucka(k.id)) }.tint(Renk.mavi)
+                            }
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if !depo.saltOkunur {
+                                Button("Sil", systemImage: "trash", role: .destructive) { silinecek = k }
+                            }
+                        }
                 }
                 if !v.biten.isEmpty {
                     Button {
@@ -41,9 +51,12 @@ struct KuluckaEkrani: View {
                     }
                 }
             }
-            .padding(16)
-            .padding(.bottom, 12)
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(Renk.zemin)
         .refreshable { await depo.yukle() }
         .navigationTitle("Kuluçka")

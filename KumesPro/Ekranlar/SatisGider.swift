@@ -18,6 +18,7 @@ struct SatisFormu: View {
     @State private var calisiyor = false
     @State private var hazir = false
     @State private var silOnay = false
+    @State private var rehberAcik = false
 
     private var toplam: Double {
         urunler.reduce(0) { r, x in r + Double(x.tip == .hayvan ? x.erkekAdet + x.disiAdet : x.adet) * x.fiyat }
@@ -30,6 +31,7 @@ struct SatisFormu: View {
                 Section {
                     TextField("Müşteri (isteğe bağlı)", text: $musteri)
                         .textContentType(.name)
+                    Button { rehberAcik = true } label: { Label("Rehberden seç", systemImage: "person.crop.circle") }
                     GunSecici(baslik: "Tarih", gun: $tarih)
                 }
                 ForEach(urunler) { u in
@@ -84,6 +86,12 @@ struct SatisFormu: View {
             } message: { Text("Satılan hayvan/civcivler ilgili kümes/üniteye geri eklenir.") }
         }
         .interactiveDismissDisabled(calisiyor)
+        .background {
+            RehberSecici(acik: $rehberAcik, sec: { ad in
+                if ad.isEmpty { gezinti.goster(KuralHatasi("Seçilen kişinin adı bulunamadı.")) }
+                else { musteri = ad }
+            }).frame(width: 0, height: 0)
+        }
     }
 
     private var eskiSatis: Satis? { satisId.flatMap { id in depo.veri.satislar.first { $0.id == id } } }
