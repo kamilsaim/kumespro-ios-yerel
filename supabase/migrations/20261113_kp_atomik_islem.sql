@@ -15,7 +15,7 @@ drop policy if exists kp_islem_kendi on public.kp_islem_sonuclari;
 create policy kp_islem_kendi on public.kp_islem_sonuclari
   for all to authenticated using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
-revoke all on public.kp_islem_sonuclari from anon;
+revoke all on public.kp_islem_sonuclari from anon, authenticated;
 grant select, insert on public.kp_islem_sonuclari to authenticated;
 
 create or replace function public.kp_atomik_islem(istek_id uuid, islemler jsonb, kullanici_id uuid)
