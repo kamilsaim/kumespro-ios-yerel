@@ -4,7 +4,7 @@ on:
 jobs:
   derleme:
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: maxim-lobanov/setup-xcode@v1
@@ -12,24 +12,25 @@ jobs:
           xcode-version: latest-stable
       - run: brew install xcodegen
       - run: xcodegen generate
-      - name: Simulatoru derleme sirasinda baslat
+      - name: Simulatoru sec
         run: |
           xcrun simctl list runtimes
           DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); keys=sorted(d["devices"],reverse=True); print(next(x["udid"] for k in keys for x in d["devices"][k] if "iPhone" in x["name"]))')
           echo "DEVICE=$DEVICE" >> "$GITHUB_ENV"
-          open -a Simulator
-          xcrun simctl boot "$DEVICE"
       - name: Simulator icin imzasiz derle
         run: |
           set -o pipefail
-          xcodebuild -project KumesPro.xcodeproj -scheme KumesPro -sdk iphonesimulator -configuration Debug -derivedDataPath build -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build 2>&1 | tee derleme.log
+          xcodebuild build-for-testing -project KumesPro.xcodeproj -scheme KumesPro -sdk iphonesimulator -configuration Debug -derivedDataPath build -destination 'generic/platform=iOS Simulator' -jobs 2 ARCHS=$(uname -m) ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO 2>&1 | tee derleme.log
       - name: Simulatoru ac ve ekran goruntusu al
         timeout-minutes: 12
         run: |
           echo "Simulator: $DEVICE"
+          open -a Simulator
+          xcrun simctl boot "$DEVICE"
           xcrun simctl bootstatus "$DEVICE" -b
           xcrun simctl status_bar "$DEVICE" override --time '9:41' --dataNetwork wifi --wifiMode active --wifiBars 3 --batteryState charged --batteryLevel 100
           xcrun simctl install "$DEVICE" build/Build/Products/Debug-iphonesimulator/KumesPro.app
+          xcrun simctl privacy "$DEVICE" grant contacts com.kamilsaim.kumespro
           xcrun simctl launch "$DEVICE" com.kamilsaim.kumespro
           sleep 8
           mkdir -p ekranlar
@@ -42,7 +43,7 @@ jobs:
         run: |
           set -o pipefail
           xcrun simctl ui "$DEVICE" appearance light
-          xcodebuild test -project KumesPro.xcodeproj -scheme KumesPro -configuration Debug -derivedDataPath build -destination "platform=iOS Simulator,id=$DEVICE" -parallel-testing-enabled NO -resultBundlePath arayuz-sonuc.xcresult CODE_SIGNING_ALLOWED=NO 2>&1 | tee arayuz-test.log
+          xcodebuild test-without-building -project KumesPro.xcodeproj -scheme KumesPro -configuration Debug -derivedDataPath build -destination "platform=iOS Simulator,id=$DEVICE" -parallel-testing-enabled NO -resultBundlePath arayuz-sonuc.xcresult CODE_SIGNING_ALLOWED=NO 2>&1 | tee arayuz-test.log
       - name: Arayuz ekranlarini disa aktar
         if: always()
         run: |

@@ -61,6 +61,7 @@ targets:
       path: KumesPro/Info.plist
       properties:
         CFBundleDisplayName: KümesPro
+        NSContactsUsageDescription: Yalnız simülatör arayüz testinde geçici kişi oluşturulur.
         CFBundleDevelopmentRegion: tr
         CFBundleLocalizations: [tr]
         CFBundleShortVersionString: $(MARKETING_VERSION)

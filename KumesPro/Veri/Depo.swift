@@ -1,4 +1,5 @@
 import Foundation
+import Contacts
 import Observation
 import Supabase
 import KumesCekirdek
@@ -10,6 +11,16 @@ import KumesCekirdek
 final class Depo {
     #if DEBUG && targetEnvironment(simulator)
     func simulatorOrnegi() {
+        let rehber = CNContactStore()
+        let eslesen = try? rehber.unifiedContacts(matching: CNContact.predicateForContacts(matchingName: "KümesPro Test Müşteri"), keysToFetch: [CNContactIdentifierKey as CNKeyDescriptor])
+        if eslesen?.isEmpty == true {
+            let kisi = CNMutableContact()
+            kisi.givenName = "KümesPro"
+            kisi.familyName = "Test Müşteri"
+            let istek = CNSaveRequest()
+            istek.add(kisi, toContainerWithIdentifier: nil)
+            do { try rehber.execute(istek) } catch { print("QA rehber kaydı oluşturulamadı:", error) }
+        }
         var k = Kumes(id: "qa-kumes", ad: "Örnek Brahma Kümesi", tur: "tavuk")
         k.irklar = [Irk(ad: "Brahma", erkek: 8, disi: 40, id: "qa-irk")]
         var g = Kumes(id: "qa-guvercin", ad: "Örnek Güvercinlik", tur: "guvercin")

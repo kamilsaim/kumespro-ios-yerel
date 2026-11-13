@@ -1,6 +1,34 @@
 import XCTest
 
 final class ArayuzTests: XCTestCase {
+    func testRehberSecimiVeIptalSatisFormunuKapatmaz() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--kp-arayuz-testi", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Ekle"].waitForExistence(timeout: 30))
+        app.buttons["Ekle"].tap()
+        app.buttons["Satış"].tap()
+        let musteri = app.textFields["Müşteri (isteğe bağlı)"]
+        XCTAssertTrue(musteri.waitForExistence(timeout: 10))
+        musteri.tap()
+        musteri.typeText("Korunacak taslak")
+        app.buttons["Rehberden seç"].tap()
+        let kisi = app.staticTexts["KümesPro Test Müşteri"].firstMatch
+        XCTAssertTrue(kisi.waitForExistence(timeout: 15))
+        kisi.tap()
+        XCTAssertTrue(app.navigationBars["Yeni satış"].waitForExistence(timeout: 10))
+        XCTAssertEqual(musteri.value as? String, "KümesPro Test Müşteri")
+        ekran("07-ios-rehber-secim-sonrasi-form")
+        app.buttons["Rehberden seç"].tap()
+        XCTAssertTrue(kisi.waitForExistence(timeout: 10))
+        let kapat = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "İptal", "Vazgeç"])).allElementsBoundByIndex.first { $0.isHittable }
+        XCTAssertNotNil(kapat)
+        kapat?.tap()
+        XCTAssertTrue(app.navigationBars["Yeni satış"].waitForExistence(timeout: 10))
+        XCTAssertEqual(musteri.value as? String, "KümesPro Test Müşteri")
+        ekran("08-ios-rehber-iptal-sonrasi-form")
+    }
     private func ekran(_ ad: String) {
         let ek = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         ek.name = ad
