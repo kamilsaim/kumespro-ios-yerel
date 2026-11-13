@@ -108,8 +108,10 @@ struct AyarlarEkrani: View {
                     Button("Çıkış yap") { cikisOnay = true }
                     NavigationLink { HesapSilEkrani() } label: { Text("Hesabımı sil").foregroundStyle(Renk.kirmizi) }
                 } footer: {
-                    Text("KümesPro \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
-                        .frame(maxWidth: .infinity).padding(.top, 8)
+                    VStack(spacing: 6) {
+                        Image("Logo").resizable().scaledToFit().frame(width: 64, height: 64).accessibilityHidden(true)
+                        Text("KümesPro \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
+                    }.frame(maxWidth: .infinity).padding(.top, 8)
                 }
             }
             .kpZemin()

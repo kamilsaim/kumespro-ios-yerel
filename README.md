@@ -39,18 +39,14 @@ DIST_CERT_P12_BASE64, DIST_CERT_PASSWORD.
 
 ## 13 Kasım 2026 yerel sürüm çalışması
 
-- Ana ekran `yeni/ekran.png` referansına göre yeşil/krem düzene geçirildi. Dört sekme Ana Sayfa, Kümesler, Kayıtlar ve Raporlar.
-- Hızlı işlemlerde Not Ekle yerine Kuluçka Başlat kullanılıyor. Logo ve uygulama ikonu tam `yeni/yenilogo.png` kaynağından üretildi.
-- Geçersiz yedek listeleri reddediliyor. Aynı stok kaynağını kullanan satış satırlarının toplamı denetleniyor.
-- Satış, çıkım, aktarım ve yedek işlemleri `kp_atomik_islem` ile tek transaction içinde yazılıyor.
-  Beklenen eski satır karşılaştırması çakışmayı reddeder. Bekleyen istek cihazda korunur ve aynı kimlikle tekrar doğrulanır.
-- Canlı kullanım öncesinde `supabase/migrations/20261113_kp_atomik_islem.sql` uygulanmalı.
-  `supabase/tests/kp_atomik_islem_test.sql` transaction testlerini ROLLBACK içinde çalıştırır.
-- Bu değişiklikler TestFlight'a yüklenmedi. GitHub doğrulama işleri ödeme/harcama limiti nedeniyle adımlar başlamadan durdu.
-  Çekirdek testleri ve imzasız iOS simulator derlemesi bu nedenle henüz doğrulanamadı.
+- iOS mevcut mavi/turuncu tasarımını korur. Rehberden müşteri seçimi ve satış/kuluçkada kaydırarak düzenleme eklendi.
+- Ortak şeffaf horoz/kümes logosu ikon, açılış ve ayarlar kaynaklarına işlendi. Kaynak `yeni/yenilogo-sade.png`.
+- Atomik Supabase kayıt, stok/çıkım/yedek denetimleri uygulandı; 32 Swift çekirdek testi, 6 SQL ve 9 HTTP kontrolü başarılı.
+- TestFlight 8.0 (191) yüklendi. Bu sürümde bildirilen rehber seçimi sonrası satış formunun kapanması kodda düzeltildi; yeni native sunucu ve regresyon testi hazır.
+- Son rehber düzeltmesi ve yeni marka kaynakları henüz iOS üzerinde doğrulanmadı. Kullanıcının isteğiyle yeni TestFlight derlemesi gönderilmeyecek.
 
 ### Önceki açık işler
-- Temiz logo (1024, çerçevesiz, yazısız) ve tür başına ≥300 px şeffaf PNG gelince Assets'teki geçici görselleri değiştir.
+- Tür resimlerini ileride kullanıcı tarafından sağlanan fotoğraflarla güncelle.
 - `kp_apple_jeton`'a satır düştüğünü ve test Apple hesabıyla silmeyi doğrula.
 - Formlarda kaydedilmemiş değişiklikte kaydırarak kapatma onayı (HIG).
 - 8.0 (141) TestFlight'ta (4 Kas 2026): yedekten geri yükleme (Ayarlar) — iPhone'da denenecek.
