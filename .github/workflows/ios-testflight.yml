@@ -15,10 +15,26 @@ jobs:
       - name: Simulator icin imzasiz derle
         run: |
           set -o pipefail
-          xcodebuild -project KumesPro.xcodeproj -scheme KumesPro -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build 2>&1 | tee derleme.log
+          xcodebuild -project KumesPro.xcodeproj -scheme KumesPro -sdk iphonesimulator -configuration Debug -derivedDataPath build -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build 2>&1 | tee derleme.log
+      - name: Simulatoru ac ve ekran goruntusu al
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for a in d["devices"].values() for x in a if "iPhone" in x["name"]))')
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl status_bar "$DEVICE" override --time '9:41' --dataNetwork wifi --wifiMode active --wifiBars 3 --batteryState charged --batteryLevel 100
+          xcrun simctl install "$DEVICE" build/Build/Products/Debug-iphonesimulator/KumesPro.app
+          xcrun simctl launch "$DEVICE" com.kamilsaim.kumespro
+          sleep 8
+          mkdir -p ekranlar
+          xcrun simctl io "$DEVICE" screenshot ekranlar/ios-giris.png
+          xcrun simctl ui "$DEVICE" appearance dark
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot ekranlar/ios-giris-gece.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ios-derleme-kaydi
-          path: derleme.log
+          path: |
+            derleme.log
+            ekranlar/
           retention-days: 7
