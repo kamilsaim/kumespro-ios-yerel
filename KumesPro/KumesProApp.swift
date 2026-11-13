@@ -51,6 +51,7 @@ struct AcilisEkrani: View {
         ZStack {
             Color("Zemin").ignoresSafeArea()
             Image("Acilis").resizable().scaledToFit().frame(width: 160, height: 160)
+                .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
         }
     }
 }
@@ -70,6 +71,7 @@ struct GirisEkrani: View {
             VStack(spacing: 0) {
                 Spacer()
                 Image("Logo").resizable().scaledToFit().frame(width: 132, height: 132)
+                    .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).stroke(.white.opacity(0.9), lineWidth: 3))
                     .shadow(color: .black.opacity(0.25), radius: 16, y: 8)
                     .accessibilityHidden(true)

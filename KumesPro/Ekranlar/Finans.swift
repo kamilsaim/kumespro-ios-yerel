@@ -171,9 +171,10 @@ struct FinansEkrani: View {
                     Button("Sil", role: .destructive) { silinecek = x }
                 }
             }
-            .swipeActions(edge: .leading) {
-                if !depo.saltOkunur, s.kalan > 0 {
-                    Button("Alındı") { tahsil = s }.tint(Renk.yesilDolgu)
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                if !depo.saltOkunur {
+                    Button("Düzenle", systemImage: "pencil") { gezinti.ac(.satis(s.id)) }.tint(Renk.mavi)
+                    if s.kalan > 0 { Button("Alındı") { tahsil = s }.tint(Renk.yesilDolgu) }
                 }
             }
         } else if let g = x.gider {
