@@ -221,22 +221,30 @@ struct GunSecici: View {
 
 /// Kaydet düğmesi taşıyan form araç çubuğu: iki kez basmayı engeller (web `guardClick`).
 struct FormAracCubugu: ToolbarContent {
+    @Environment(Depo.self) private var depo
+    @Environment(Gezinti.self) private var gezinti
+    @State private var ilkVeri: Veri?
     let baslik: String
     @Binding var calisiyor: Bool
     var kaydet: () async -> Void
     var vazgec: () -> Void
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .cancellationAction) { Button("Vazgeç", action: vazgec) }
+        ToolbarItem(placement: .cancellationAction) { Button("Vazgeç", action: vazgec).disabled(calisiyor) }
         ToolbarItem(placement: .confirmationAction) {
             if calisiyor {
                 ProgressView()
             } else {
                 Button(baslik) {
+                    guard let ilkVeri, ilkVeri == depo.veri else {
+                        gezinti.goster(KuralHatasi("Form açıldıktan sonra veriler değişti. Formu yeniden açıp tekrar deneyin."))
+                        return
+                    }
                     calisiyor = true
                     Task { await kaydet(); calisiyor = false }
                 }
                 .fontWeight(.bold)
+                .onAppear { if ilkVeri == nil { ilkVeri = depo.veri } }
             }
         }
     }

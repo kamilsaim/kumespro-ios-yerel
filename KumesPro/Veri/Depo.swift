@@ -18,6 +18,7 @@ final class Depo {
 
     @ObservationIgnored private var kullanici: String?
     @ObservationIgnored private var yaziliyor = false
+    @ObservationIgnored private var nesil = 0
     @ObservationIgnored private var sunucuSatirlari: [String: [String: JSONNesne]] = [:]
 
     private func kaliciKimlik() -> String { UUID().uuidString.lowercased() }
@@ -91,8 +92,9 @@ final class Depo {
             }
         }
         guard !islemler.isEmpty else { return }
+        let istekNesli = nesil
         yaziliyor = true
-        defer { yaziliyor = false }
+        defer { if istekNesli == nesil { yaziliyor = false } }
         let istek: JSONNesne = ["istek_id": .metin(kaliciKimlik()), "islemler": .dizi(islemler.map { .nesne($0) }),
                                 "kullanici_id": .metin(uid)]
         let data = try JSONEncoder().encode(istek)
@@ -100,9 +102,9 @@ final class Depo {
         var ayarlar = URLResourceValues()
         ayarlar.isExcludedFromBackup = true
         var dosyaURL = dosya
-        try dosyaURL.setResourceValues(ayarlar)
+        try? dosyaURL.setResourceValues(ayarlar)
         try await bekleyeniTamamla(uid)
-        guard uid == kullanici else { return }
+        guard uid == kullanici, istekNesli == nesil else { return }
         veri = yeni
         for (tablo, kayitlar) in satirlar(yeni) {
             sunucuSatirlari[tablo] = Dictionary(uniqueKeysWithValues: kayitlar)
@@ -121,6 +123,9 @@ final class Depo {
 
     func baslat(kullanici: String?) async {
         guard kullanici != self.kullanici else { return }
+        nesil += 1
+        yukleniyor = false
+        yaziliyor = false
         self.kullanici = kullanici
         veri = Veri(); arsiv = nil; sezonlar = []; sunucuSatirlari = [:]; hata = nil; yuklendi = false
         guard kullanici != nil else { return }
@@ -145,8 +150,9 @@ final class Depo {
 
     func yukle() async {
         guard let uid = kullanici, !yaziliyor, !yukleniyor else { return }
+        let istekNesli = nesil
         yukleniyor = true
-        defer { yukleniyor = false }
+        defer { if istekNesli == nesil { yukleniyor = false } }
         do {
             try await bekleyeniTamamla(uid)
             async let k = liste("kumesler", uid: uid)
@@ -155,7 +161,7 @@ final class Depo {
             async let s = liste("satislar", uid: uid)
             async let g = liste("giderler", uid: uid)
             let (kr, kur, ur, sr, gr) = try await (k, ku, u, s, g)
-            guard uid == kullanici else { return }
+            guard uid == kullanici, istekNesli == nesil else { return }
             for (tablo, kayitlar) in [("kumesler", kr), ("kuluckalar", kur), ("civciv_uniteleri", ur),
                                      ("satislar", sr), ("giderler", gr)] {
                 sunucuSatirlari[tablo] = Dictionary(uniqueKeysWithValues: kayitlar.compactMap { r in
@@ -423,6 +429,7 @@ final class Depo {
     }
 
     func sezonGor(_ s: Sezon) {
+        guard !yaziliyor, !yukleniyor else { return }
         arsiv = s
         veri = s.anlikVeri
     }
@@ -441,6 +448,8 @@ final class Depo {
 
     func yedekYukle(_ y: Yedek) async throws -> Int {
         try yazilabilir()
+        let oncekiVeri = veri
+        let istekNesli = nesil
         var v = y.veri
         var km: [String: String] = [:]
         for i in v.kumesler.indices {
@@ -463,6 +472,9 @@ final class Depo {
         for i in v.satislar.indices { v.satislar[i].id = kaliciKimlik() }
         for i in v.giderler.indices { v.giderler[i].id = kaliciKimlik() }
         await sezonlariYukle()
+        guard nesil == istekNesli, veri == oncekiVeri else {
+            throw KuralHatasi("Veriler değişti. Yedeği tekrar seçip yeniden deneyin.")
+        }
         let mevcut = Set(sezonlar.map(\.id))
         var ek = [arsivIslemi(ad: "Yedek öncesi " + Gun.goster(Date()))]
         for s in y.sezonlar where !mevcut.contains(s.metin("id") ?? "") {
