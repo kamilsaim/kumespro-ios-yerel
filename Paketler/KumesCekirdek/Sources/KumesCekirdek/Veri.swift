@@ -166,7 +166,10 @@ extension Veri {
     }
 
     /// Partiyi tamamen sil (web `silParti`).
-    public mutating func partiSil(uniteId: String, partiId: String) {
+    public mutating func partiSil(uniteId: String, partiId: String) throws {
+        guard !satislar.contains(where: { s in s.urunler.contains(where: {
+            $0.tip == .civciv && $0.uniteId == uniteId && $0.partiId == partiId
+        }) }) else { throw KuralHatasi("Bu partiye bağlı satış var. Önce satışı iptal edin; stok iadesi korunmalı.") }
         guard let ui = uniteIndeks(uniteId), let p = uniteler[ui].parti(partiId) else { return }
         uniteler[ui].adet = max(0, uniteler[ui].adet - p.kalan)
         uniteler[ui].hareketler.removeAll { $0.partiId == partiId }

@@ -2,6 +2,23 @@ import XCTest
 @testable import KumesCekirdek
 
 final class KuralTests: XCTestCase {
+    func testSatilanPartiSilinemezVeIadeAsilPartiyeDoner() throws {
+        var v = ornek()
+        var c = SatisUrunu.yeni(tip: .civciv, kumesId: nil, irkId: nil, uniteId: "u1")
+        c.partiId = "p1"; c.adet = 5; c.fiyat = 20
+        var urunler = [c]
+        try v.satisDogrula(urunler, eski: nil)
+        _ = v.satisUygula(&urunler, eski: nil, musteri: "Deneme", tarih: "2026-11-13")
+        let s = Satis(id: "s1", musteri: "Deneme", tarih: "2026-11-13", urunler: urunler,
+                      toplam: 100, odenen: 0, not: nil)
+        v.satislar = [s]
+        XCTAssertThrowsError(try v.partiSil(uniteId: "u1", partiId: "p1"))
+        XCTAssertEqual(v.uniteler[0].adet, 25)
+        _ = v.satisStokIade(s, notOnEk: "İptal")
+        XCTAssertEqual(v.uniteler[0].adet, 30)
+        XCTAssertEqual(v.uniteler[0].parti("p1")?.kalan, 30)
+    }
+
     func testAyniStokBirdenFazlaSatirdaAsilamaz() throws {
         let v = ornek()
         XCTAssertThrowsError(try v.satisDogrula([hayvan(6, 0), hayvan(6, 0)], eski: nil))
@@ -138,7 +155,7 @@ final class KuralTests: XCTestCase {
         XCTAssertEqual(v.uniteler[0].parti("p1")?.kaynak, "Genel")
         try v.partiEkle(uniteId: "u1", adet: 5, kaynak: "Sussex", not: "", tarih: "2026-11-01")
         XCTAssertEqual(v.uniteler[0].adet, 35)
-        v.partiSil(uniteId: "u1", partiId: "p1")
+        try v.partiSil(uniteId: "u1", partiId: "p1")
         XCTAssertEqual(v.uniteler[0].adet, 5)
     }
 

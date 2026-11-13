@@ -288,7 +288,7 @@ final class Depo {
     }
 
     func partiSil(uniteId: String, partiId: String) async throws {
-        try await uniteDegistir(uniteId) { $0.partiSil(uniteId: uniteId, partiId: partiId) }
+        try await uniteDegistir(uniteId) { try $0.partiSil(uniteId: uniteId, partiId: partiId) }
     }
 
     func kumeseAktar(uniteId: String, partiId: String, kumesId: String, irkId: String?, yeniIrk: String,
