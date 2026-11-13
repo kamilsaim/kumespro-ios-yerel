@@ -12,6 +12,7 @@ final class KuralTests: XCTestCase {
         let s = Satis(id: "s1", musteri: "Deneme", tarih: "2026-11-13", urunler: urunler,
                       toplam: 100, odenen: 0, not: nil)
         v.satislar = [s]
+        XCTAssertThrowsError(try v.stokKaynagiSilinebilir(uniteId: "u1"))
         XCTAssertThrowsError(try v.partiSil(uniteId: "u1", partiId: "p1"))
         XCTAssertEqual(v.uniteler[0].adet, 25)
         _ = v.satisStokIade(s, notOnEk: "İptal")

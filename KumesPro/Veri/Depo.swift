@@ -219,6 +219,7 @@ final class Depo {
     }
 
     func kumesSil(_ id: String) async throws {
+        try veri.stokKaynagiSilinebilir(kumesId: id)
         var v = veri
         v.kumesler.removeAll { $0.id == id }
         try await atomikKaydet(v)
@@ -261,6 +262,7 @@ final class Depo {
     }
 
     func uniteSil(_ id: String) async throws {
+        try veri.stokKaynagiSilinebilir(uniteId: id)
         var v = veri
         v.uniteler.removeAll { $0.id == id }
         try await atomikKaydet(v)

@@ -513,3 +513,13 @@ extension Veri {
         }
     }
 }
+
+
+extension Veri {
+    public func stokKaynagiSilinebilir(kumesId: String? = nil, uniteId: String? = nil) throws {
+        guard !satislar.contains(where: { s in s.urunler.contains(where: {
+            (kumesId != nil && $0.tip == .hayvan && $0.kumesId == kumesId) ||
+            (uniteId != nil && $0.tip == .civciv && $0.uniteId == uniteId)
+        }) }) else { throw KuralHatasi("Bu kayda bağlı satış var. Önce satışı iptal edin; stok iadesi korunmalı.") }
+    }
+}
