@@ -49,13 +49,15 @@ public enum JSON: Codable, Equatable, Hashable, Sendable {
 
     public var int: Int? {
         guard let d = double, d.isFinite else { return nil }
-        return Int(d.rounded(.towardZero))
+        return Int(exactly: d.rounded(.towardZero))
     }
 
     public var string: String? {
         switch self {
         case .metin(let s): return s
-        case .sayi(let d): return d.rounded() == d ? String(Int64(d)) : String(d)
+        case .sayi(let d):
+            if let tam = Int64(exactly: d) { return String(tam) }
+            return String(d)
         case .bool(let b): return b ? "true" : "false"
         default: return nil
         }

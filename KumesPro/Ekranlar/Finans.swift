@@ -25,6 +25,10 @@ struct FinansEkrani: View {
     @State private var silinecek: FinansKaydi?
     @State private var tahsil: Satis?
 
+    init(ilkFiltre: FinansFiltre = .tumu) {
+        _filtre = State(initialValue: ilkFiltre)
+    }
+
     var body: some View {
         let v = depo.veri
         let o = v.finansOzeti(ay: ay)

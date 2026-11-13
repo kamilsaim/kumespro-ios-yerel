@@ -15,13 +15,10 @@ struct AnaKabuk: View {
             TabView(selection: $g.sekme) {
                 NavigationStack { OzetEkrani() }.tag(Sekme.ozet).toolbar(.hidden, for: .tabBar)
                 NavigationStack { KumeslerEkrani() }.tag(Sekme.kumesler).toolbar(.hidden, for: .tabBar)
-                NavigationStack { KuluckaEkrani() }.tag(Sekme.kulucka).toolbar(.hidden, for: .tabBar)
-                NavigationStack { FinansEkrani() }.tag(Sekme.finans).toolbar(.hidden, for: .tabBar)
+                NavigationStack { KayitlarEkrani() }.tag(Sekme.kulucka).toolbar(.hidden, for: .tabBar)
+                NavigationStack { RaporlarEkrani() }.tag(Sekme.finans).toolbar(.hidden, for: .tabBar)
             }
-            AltCubuk(secili: $g.sekme) {
-                if depo.saltOkunur { gezinti.goster(KuralHatasi("Arşiv görüntüleniyor\nYeni kayıt için önce canlı veriye dönün.")) }
-                else { gezinti.ac(.ekleMenusu) }
-            }
+            AltCubuk(secili: $g.sekme)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .background(Renk.zemin)
@@ -94,42 +91,23 @@ struct ArsivSeridi: View {
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Renk.turuncu)
+        .background(Renk.baslikYesil)
     }
 }
 
 /// Özel alt çubuk: dört sekme, ortada yükseltilmiş + düğmesi.
 struct AltCubuk: View {
     @Binding var secili: Sekme
-    var ekle: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
-            dugme(.ozet, "Özet", "house")
+            dugme(.ozet, "Ana Sayfa", "house")
             dugme(.kumesler, "Kümesler", "square.grid.2x2")
-            Button(action: { Titresim.dokun(); ekle() }) {
-                Image(systemName: "plus")
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 60, height: 60)
-                    .background(Renk.turuncu, in: Circle())
-                    .overlay(Circle().stroke(Renk.kart, lineWidth: 4))
-                    .shadow(color: Renk.turuncu.opacity(0.4), radius: 10, y: 6)
-            }
-            .offset(y: -18)
-            .frame(maxWidth: .infinity)
-            .accessibilityLabel("Ekle")
-            dugme(.kulucka, "Kuluçka", "oval.portrait")
-            dugme(.finans, "Finans", "chart.bar")
+            dugme(.kulucka, "Kayıtlar", "list.bullet.rectangle")
+            dugme(.finans, "Raporlar", "chart.bar")
         }
-        .padding(.top, 6)
-        .frame(height: 58, alignment: .top)
-        .background(
-            Renk.kart
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24, style: .continuous))
-                .shadow(color: .black.opacity(0.07), radius: 12, y: -4)
-                .ignoresSafeArea(edges: .bottom)
-        )
+        .padding(.vertical, 8)
+        .background(Renk.kart.ignoresSafeArea(edges: .bottom))
     }
 
     private func dugme(_ s: Sekme, _ ad: String, _ simge: String) -> some View {
@@ -138,16 +116,14 @@ struct AltCubuk: View {
             if !acik { Titresim.dokun() }
             secili = s
         } label: {
-            VStack(spacing: 2) {
-                Image(systemName: acik ? simge + ".fill" : simge)
-                    .font(.system(size: 19, weight: .semibold))
-                    .frame(width: 52, height: 30)
-                    .background(acik ? Renk.maviAcik : .clear, in: Capsule())
-                Text(ad).font(.system(size: 10.5, weight: .semibold))
+            VStack(spacing: 4) {
+                Image(systemName: simge).font(.title3)
+                Text(ad).font(.caption.weight(.semibold))
             }
-            .foregroundStyle(acik ? Renk.mavi : Renk.ikincil)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .contentShape(Rectangle())
+            .foregroundStyle(acik ? .white : Renk.metin)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.vertical, 4)
+            .background(acik ? Renk.baslikYesil : .clear, in: RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(acik ? .isSelected : [])

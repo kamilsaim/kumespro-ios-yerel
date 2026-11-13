@@ -6,6 +6,10 @@ func cozJSON(_ s: String) -> JSONNesne {
 }
 
 final class ModelTests: XCTestCase {
+    func testBuyukJSONSayisiTamSayiyaDonusturulurkenCokmez() {
+        XCTAssertNil(JSON.sayi(1e100).int)
+        XCTAssertEqual(JSON.sayi(1e100).string, String(1e100))
+    }
     func testJSONGidisDonusTanimadikAlanlariKorur() throws {
         let r = cozJSON(#"{"id":"k1","ad":"Büyük","tur":"tavuk","not_":null,"irklar":[{"id":"x1","ad":"Brahma","erkek":3,"disi":5,"renk":"sari"}],"hareketler":[]}"#)
         var k = Kumes(satir: r)

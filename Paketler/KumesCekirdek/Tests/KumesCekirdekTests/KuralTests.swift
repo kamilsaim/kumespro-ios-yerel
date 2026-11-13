@@ -2,6 +2,36 @@ import XCTest
 @testable import KumesCekirdek
 
 final class KuralTests: XCTestCase {
+    func testAyniStokBirdenFazlaSatirdaAsilamaz() throws {
+        let v = ornek()
+        XCTAssertThrowsError(try v.satisDogrula([hayvan(6, 0), hayvan(6, 0)], eski: nil))
+        try v.satisDogrula([hayvan(6, 0), hayvan(4, 0)], eski: nil)
+        var c = SatisUrunu.yeni(tip: .civciv, kumesId: nil, irkId: nil, uniteId: "u1")
+        c.partiId = "p1"; c.adet = 20; c.fiyat = 10
+        XCTAssertThrowsError(try v.satisDogrula([c, c], eski: nil))
+    }
+
+    func testDuzenlemeKredisiHerSatirIcinTekrarKullanilamaz() throws {
+        var v = ornek()
+        var urunler = [hayvan(10, 0)]
+        _ = v.satisUygula(&urunler, eski: nil, musteri: nil, tarih: "2026-11-13")
+        let eski = Satis(id: "s1", musteri: nil, tarih: "2026-11-13", urunler: urunler,
+                         toplam: 1000, odenen: 0, not: nil)
+        XCTAssertThrowsError(try v.satisDogrula([hayvan(6, 0), hayvan(6, 0)], eski: eski))
+    }
+
+    func testTamamlananCikimTekrarStokEklemez() throws {
+        var v = ornek()
+        v.kuluckalar = [Kulucka(id: "q", ad: "Test", baslangic: "2026-11-01", sure: 21,
+                               kaynaklar: [YumurtaKaynagi(kumesId: "k1", adet: 5)])]
+        var satirlar = v.cikimSatirlari(kuluckaId: "q")
+        satirlar[0].civciv = 4; satirlar[0].bos = 1
+        _ = try v.cikimKaydet(kuluckaId: "q", satirlar: satirlar, tarih: "2026-11-22", not: "", uniteId: "u1")
+        XCTAssertThrowsError(try v.cikimKaydet(kuluckaId: "q", satirlar: satirlar,
+                                             tarih: "2026-11-22", not: "", uniteId: "u1"))
+        XCTAssertEqual(v.uniteler[0].adet, 34)
+    }
+
     func ornek() -> Veri {
         var k = Kumes(id: "k1", ad: "Büyük", tur: "tavuk")
         k.irklar = [Irk(ad: "Brahma", erkek: 10, disi: 20, id: "r1"), Irk(ad: "Sussex", erkek: 2, disi: 3, id: "r2")]

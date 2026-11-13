@@ -17,6 +17,13 @@ final class Oturum {
 
     var kullaniciId: String? { kullanici?.id.uuidString.lowercased() }
 
+    var adSoyad: String {
+        for alan in ["full_name", "name"] {
+            if case let .string(ad)? = kullanici?.userMetadata[alan], !ad.isEmpty { return ad }
+        }
+        return gorunum.ad
+    }
+
     var gorunum: HesapGorunum {
         let md = kullanici?.userMetadata ?? [:]
         var ad: String?

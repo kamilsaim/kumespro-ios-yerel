@@ -64,6 +64,7 @@ final class Gezinti {
     var serit: String?
     /// Kümesler sekmesinde açık bölüm (kümes / ünite).
     var uniteBolumu = false
+    var kayitBolumu = 0
     /// Soğuk açılışta ikon menüsü / bildirim: oturum hazır olunca işlenir.
     var bekleyenPencere: Pencere?
     var bekleyenSekme: Sekme?

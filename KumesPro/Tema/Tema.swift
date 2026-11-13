@@ -14,17 +14,19 @@ private func cift(_ acik: UIColor, _ koyu: UIColor) -> Color {
 }
 
 enum Renk {
-    static let zemin = cift(hex(0xF2F5F7), hex(0x0E141B))
-    static let kart = cift(hex(0xFFFFFF), hex(0x18212B))
+    static let baslikYesil = Color(hex(0x003D2E))
+    static let altin = Color(hex(0xF4D48B))
+    static let zemin = cift(hex(0xF7F4EC), hex(0x101B17))
+    static let kart = cift(hex(0xFFFCF5), hex(0x192820))
     static let kartIkinci = cift(hex(0xEEF1F4), hex(0x222C37))
     static let cizgi = cift(hex(0xE4E8EC), hex(0x2B3642))
     static let metin = cift(hex(0x1E2832), hex(0xEEF2F6))
     static let ikincil = cift(hex(0x5E6977), hex(0xA3AFBC))
 
     /// --pri: ana mavi (beyaz yazı alacak koyu ton)
-    static let mavi = cift(hex(0x1F6DB5), hex(0x4C9BE6))
-    static let maviKoyu = cift(hex(0x1A5C9E), hex(0x153F69))
-    static let maviAcik = cift(hex(0xE8F3FC), hex(0x1B3550))
+    static let mavi = cift(hex(0x116242), hex(0x86D7AE))
+    static let maviKoyu = cift(hex(0x003D2E), hex(0x003D2E))
+    static let maviAcik = cift(hex(0xE5F1E7), hex(0x25382E))
     static let maviOrta = Color(hex(0x2E7FCC))
 
     /// --ora: turuncu

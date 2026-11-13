@@ -243,6 +243,11 @@ extension Veri {
                                      uniteId: String?) throws -> String? {
         guard let ki = kuluckalar.firstIndex(where: { $0.id == kuluckaId }) else { throw KuralHatasi("Kuluçka bulunamadı!") }
         var k = kuluckalar[ki]
+        guard !k.tamamlandi else { throw KuralHatasi("Bu kuluçkanın çıkımı zaten kaydedilmiş.") }
+        guard !satirlar.isEmpty, satirlar.allSatisfy({
+            $0.civciv >= 0 && $0.olu >= 0 && $0.bos >= 0 &&
+            $0.civciv + $0.olu + $0.bos <= $0.yumurta
+        }) else { throw KuralHatasi("Çıkım adetlerini kontrol edin.") }
         let tC = satirlar.reduce(0) { $0 + $1.civciv }
         let tO = satirlar.reduce(0) { $0 + $1.olu }
         let tB = satirlar.reduce(0) { $0 + $1.bos }
@@ -325,38 +330,47 @@ extension Veri {
         guard !urunler.isEmpty else { throw KuralHatasi("En az bir ürün ekleyin!") }
         var krediH: [String: (e: Int, d: Int)] = [:]
         var krediP: [String: Int] = [:]
+        var talepH: [String: (e: Int, d: Int)] = [:]
+        var talepP: [String: Int] = [:]
         for r in eski?.urunler ?? [] {
             if r.tip == .hayvan {
                 let a = "\(r.kumesId ?? "")|\(r.irkId ?? "")"
                 let c = krediH[a] ?? (0, 0)
                 krediH[a] = (c.e + r.erkekAdet, c.d + r.disiAdet)
             } else if r.tip == .civciv, let p = r.partiId {
-                krediP[p, default: 0] += r.adet
+                krediP["\(r.uniteId ?? "")|\(p)", default: 0] += r.adet
             }
         }
         for r in urunler {
             switch r.tip {
             case .hayvan:
+                if r.erkekAdet < 0 || r.disiAdet < 0 { throw KuralHatasi("Hayvan adedi negatif olamaz!") }
                 if r.erkekAdet + r.disiAdet == 0 { throw KuralHatasi("Hayvan satışı için erkek ve/veya dişi adet girin!") }
-                if r.fiyat <= 0 { throw KuralHatasi("Tüm ürünler için fiyat girin!") }
+                if !r.fiyat.isFinite || r.fiyat <= 0 { throw KuralHatasi("Tüm ürünler için fiyat girin!") }
                 guard let k = kumes(r.kumesId) else { throw KuralHatasi("Kümes bulunamadı!") }
                 guard let irkId = r.irkId else { throw KuralHatasi("Hayvan satışı için bir ırk seçin!") }
                 guard let ir = k.irklar.first(where: { $0.id == irkId }) else { throw KuralHatasi("Seçilen ırk bulunamadı!") }
                 let kr = krediH["\(k.id)|\(ir.id)"] ?? (0, 0)
                 let mE = ir.erkek + kr.e, mD = ir.disi + kr.d
-                if r.erkekAdet > mE { throw KuralHatasi("\"\(k.ad) / \(ir.ad)\" için yeterli erkek yok! (Mevcut: \(mE))") }
-                if r.disiAdet > mD { throw KuralHatasi("\"\(k.ad) / \(ir.ad)\" için yeterli dişi yok! (Mevcut: \(mD))") }
+                let anahtar = "\(k.id)|\(ir.id)"
+                let onceki = talepH[anahtar] ?? (0, 0)
+                let istenen = (e: onceki.e + r.erkekAdet, d: onceki.d + r.disiAdet)
+                if istenen.e > mE { throw KuralHatasi("\"\(k.ad) / \(ir.ad)\" için yeterli erkek yok! (Mevcut: \(mE))") }
+                if istenen.d > mD { throw KuralHatasi("\"\(k.ad) / \(ir.ad)\" için yeterli dişi yok! (Mevcut: \(mD))") }
+                talepH[anahtar] = istenen
             case .civciv:
-                if r.adet <= 0 || r.fiyat <= 0 { throw KuralHatasi("Tüm ürünler için adet ve fiyat girin!") }
+                if r.adet <= 0 || !r.fiyat.isFinite || r.fiyat <= 0 { throw KuralHatasi("Tüm ürünler için adet ve fiyat girin!") }
                 guard let u = unite(r.uniteId) else { throw KuralHatasi("Civciv ünitesi bulunamadı!") }
                 guard let pid = r.partiId else { throw KuralHatasi("\"\(u.ad)\" ünitesinden bir parti seçmelisiniz!") }
                 guard let p = u.parti(pid) else { throw KuralHatasi("Seçilen parti bulunamadı!") }
-                let m = p.kalan + (krediP[pid] ?? 0)
-                if r.adet > m {
+                let anahtar = "\(u.id)|\(pid)"
+                let m = p.kalan + (krediP[anahtar] ?? 0)
+                talepP[anahtar, default: 0] += r.adet
+                if talepP[anahtar, default: 0] > m {
                     throw KuralHatasi("\"\(p.kaynak)\" partisinde yeterli \(u.tip.ad.lowercased()) yok!\nKalan: \(m), Satılmak istenen: \(r.adet)")
                 }
             default:
-                if r.adet <= 0 || r.fiyat <= 0 { throw KuralHatasi("Tüm ürünler için adet ve fiyat girin!") }
+                if r.adet <= 0 || !r.fiyat.isFinite || r.fiyat <= 0 { throw KuralHatasi("Tüm ürünler için adet ve fiyat girin!") }
             }
         }
     }

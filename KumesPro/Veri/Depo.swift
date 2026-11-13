@@ -17,6 +17,103 @@ final class Depo {
     private(set) var sezonlar: [Sezon] = []
 
     @ObservationIgnored private var kullanici: String?
+    @ObservationIgnored private var yaziliyor = false
+    @ObservationIgnored private var sunucuSatirlari: [String: [String: JSONNesne]] = [:]
+
+    private func kaliciKimlik() -> String { UUID().uuidString.lowercased() }
+
+    private func satirlar(_ v: Veri) -> [(String, [(String, JSONNesne)])] {
+        [
+            ("kumesler", v.kumesler.map { ($0.id, $0.satir) }),
+            ("civciv_uniteleri", v.uniteler.map { ($0.id, $0.satir) }),
+            ("kuluckalar", v.kuluckalar.map { ($0.id, $0.satir) }),
+            ("satislar", v.satislar.map { ($0.id, $0.satir) }),
+            ("giderler", v.giderler.map { ($0.id, $0.satir) })
+        ]
+    }
+
+    private func bekleyenDosya(_ uid: String) throws -> URL {
+        let klasor = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                                appropriateFor: nil, create: true)
+        return klasor.appendingPathComponent("kp-islem-" + uid + ".json")
+    }
+
+    /// Aynı istek kimliği tekrar gönderilir. Sunucu daha önce tamamladıysa ikinci kez uygulamaz.
+    private func bekleyeniTamamla(_ uid: String) async throws {
+        let dosya = try bekleyenDosya(uid)
+        guard FileManager.default.fileExists(atPath: dosya.path) else { return }
+        let istek = try JSONDecoder().decode(JSONNesne.self, from: Data(contentsOf: dosya))
+        do {
+            try await supabase.rpc("kp_atomik_islem", params: istek).execute()
+            try FileManager.default.removeItem(at: dosya)
+        } catch let e as PostgrestError {
+            // PostgreSQL bu hatalarda transaction'ı geri almıştır.
+            if ["40001", "PGRST202", "42501", "23503", "23514", "P0001", "22023"].contains(e.code ?? "") {
+                try FileManager.default.removeItem(at: dosya)
+            }
+            throw e
+        }
+    }
+
+    /// İlgili tüm satırlar tek transaction'da kaydedilir. Çakışmada bütün işlem geri alınır.
+    private func atomikKaydet(_ yeni: Veri, ek: [JSONNesne] = []) async throws {
+        try yazilabilir()
+        guard let uid = kullanici else { throw KuralHatasi("Oturum bulunamadı.") }
+        guard !yaziliyor else { throw KuralHatasi("Önceki işlemin bitmesini bekleyin.") }
+        let dosya = try bekleyenDosya(uid)
+        guard !FileManager.default.fileExists(atPath: dosya.path) else {
+            throw KuralHatasi("Önceki işlemin sonucu doğrulanmalı. Verileri yenileyip tekrar deneyin.")
+        }
+        let onceki = Dictionary(uniqueKeysWithValues: satirlar(veri))
+        let sonraki = satirlar(yeni)
+        var islemler = ek
+        for (tablo, kayitlar) in sonraki {
+            let eski = Dictionary(uniqueKeysWithValues: onceki[tablo] ?? [])
+            for (id, satir) in kayitlar {
+                if let eskiSatir = eski[id] {
+                    if eskiSatir != satir {
+                        let ham = sunucuSatirlari[tablo]?[id] ?? eskiSatir
+                        let beklenen = ham.filter { eskiSatir.keys.contains($0.key) }
+                        islemler.append(["tablo": .metin(tablo), "tur": .metin("guncelle"), "id": .metin(id),
+                                         "veri": .nesne(satir), "beklenen": .nesne(beklenen)])
+                    }
+                } else {
+                    islemler.append(["tablo": .metin(tablo), "tur": .metin("ekle"), "id": .metin(id), "veri": .nesne(satir)])
+                }
+            }
+        }
+        for (tablo, kayitlar) in sonraki.reversed() {
+            let kalan = Set(kayitlar.map { $0.0 })
+            for (id, satir) in onceki[tablo] ?? [] where !kalan.contains(id) {
+                let ham = sunucuSatirlari[tablo]?[id] ?? satir
+                let beklenen = ham.filter { satir.keys.contains($0.key) }
+                islemler.append(["tablo": .metin(tablo), "tur": .metin("sil"), "id": .metin(id), "beklenen": .nesne(beklenen)])
+            }
+        }
+        guard !islemler.isEmpty else { return }
+        yaziliyor = true
+        defer { yaziliyor = false }
+        let istek: JSONNesne = ["istek_id": .metin(kaliciKimlik()), "islemler": .dizi(islemler.map { .nesne($0) }),
+                                "kullanici_id": .metin(uid)]
+        let data = try JSONEncoder().encode(istek)
+        try data.write(to: dosya, options: [.atomic, .completeFileProtection])
+        var ayarlar = URLResourceValues()
+        ayarlar.isExcludedFromBackup = true
+        var dosyaURL = dosya
+        try dosyaURL.setResourceValues(ayarlar)
+        try await bekleyeniTamamla(uid)
+        guard uid == kullanici else { return }
+        veri = yeni
+        for (tablo, kayitlar) in satirlar(yeni) {
+            sunucuSatirlari[tablo] = Dictionary(uniqueKeysWithValues: kayitlar)
+        }
+        yerelleriTazele()
+    }
+
+    private func arsivIslemi(ad: String) -> JSONNesne {
+        ["tablo": .metin("sezonlar"), "tur": .metin("ekle"), "id": .metin(kaliciKimlik()),
+         "veri": .nesne(["ad": .metin(ad), "tarih": .metin(Gun.bugun), "veri": .nesne(veri.bellek)])]
+    }
 
     var saltOkunur: Bool { arsiv != nil }
 
@@ -25,43 +122,56 @@ final class Depo {
     func baslat(kullanici: String?) async {
         guard kullanici != self.kullanici else { return }
         self.kullanici = kullanici
-        veri = Veri(); arsiv = nil; sezonlar = []; yuklendi = false
+        veri = Veri(); arsiv = nil; sezonlar = []; sunucuSatirlari = [:]; hata = nil; yuklendi = false
         guard kullanici != nil else { return }
         await yukle()
     }
 
+    private func liste(_ tablo: String, uid: String) async throws -> [JSONNesne] {
+        var tum: [JSONNesne] = []
+        var baslangic = 0
+        while true {
+            let sayfa: [JSONNesne] = try await supabase.from(tablo).select().eq("user_id", value: uid)
+                .order("id").range(from: baslangic, to: baslangic + 499).execute().value
+            tum += sayfa
+            if sayfa.count < 500 { break }
+            baslangic += 500
+        }
+        if tablo == "satislar" || tablo == "giderler" {
+            tum.sort { ($0.metin("tarih") ?? "") > ($1.metin("tarih") ?? "") }
+        }
+        return tum
+    }
+
     func yukle() async {
-        guard let uid = kullanici else { return }
+        guard let uid = kullanici, !yaziliyor, !yukleniyor else { return }
         yukleniyor = true
         defer { yukleniyor = false }
         do {
-            async let k: [JSONNesne] = supabase.from("kumesler").select().eq("user_id", value: uid)
-                .order("created_at").execute().value
-            async let ku: [JSONNesne] = supabase.from("kuluckalar").select().eq("user_id", value: uid)
-                .order("created_at").execute().value
-            async let u: [JSONNesne] = supabase.from("civciv_uniteleri").select().eq("user_id", value: uid)
-                .order("created_at").execute().value
-            async let s: [JSONNesne] = supabase.from("satislar").select().eq("user_id", value: uid)
-                .order("tarih", ascending: false).execute().value
-            async let g: [JSONNesne] = supabase.from("giderler").select().eq("user_id", value: uid)
-                .order("tarih", ascending: false).execute().value
+            try await bekleyeniTamamla(uid)
+            async let k = liste("kumesler", uid: uid)
+            async let ku = liste("kuluckalar", uid: uid)
+            async let u = liste("civciv_uniteleri", uid: uid)
+            async let s = liste("satislar", uid: uid)
+            async let g = liste("giderler", uid: uid)
             let (kr, kur, ur, sr, gr) = try await (k, ku, u, s, g)
             guard uid == kullanici else { return }
-            var v = Veri(kumesler: kr.map(Kumes.init(satir:)), kuluckalar: kur.map(Kulucka.init(satir:)),
+            for (tablo, kayitlar) in [("kumesler", kr), ("kuluckalar", kur), ("civciv_uniteleri", ur),
+                                     ("satislar", sr), ("giderler", gr)] {
+                sunucuSatirlari[tablo] = Dictionary(uniqueKeysWithValues: kayitlar.compactMap { r in
+                    r.metin("id").map { ($0, r) }
+                })
+            }
+            let v = Veri(kumesler: kr.map(Kumes.init(satir:)), kuluckalar: kur.map(Kulucka.init(satir:)),
                          uniteler: ur.map(Unite.init(satir:)), satislar: sr.map(Satis.init(satir:)),
                          giderler: gr.map(Gider.init(satir:)))
-            // Eski ünite kayıtları düzeltildiyse geri yaz (web dbYukle göçü)
-            for i in v.uniteler.indices where v.uniteler[i].gocGerekli {
-                v.uniteler[i].gocGerekli = false
-                try? await uniteYaz(v.uniteler[i])
-            }
             veri = v
             arsiv = nil
             yuklendi = true
             hata = nil
             yerelleriTazele()
         } catch {
-            if !yuklendi { hata = "Veriler yüklenemedi. İnternet bağlantını kontrol edip tekrar dene." }
+            if uid == kullanici { hata = "Veriler yüklenemedi. İnternet bağlantını kontrol edip tekrar dene." }
         }
     }
 
@@ -75,6 +185,7 @@ final class Depo {
     // MARK: Genel değiştirme kalıbı
 
     private func yazilabilir() throws {
+        if !yuklendi || yukleniyor || yaziliyor { throw KuralHatasi("Veri işleminin bitmesini bekleyin.") }
         if arsiv != nil { throw KuralHatasi("Arşiv görüntüleme modundasınız. Önce canlı veriye dönün.") }
         if kullanici == nil { throw KuralHatasi("Oturum bulunamadı.") }
     }
@@ -83,57 +194,28 @@ final class Depo {
     private func degistir(_ islem: (inout Veri) throws -> Degisenler) async throws {
         try yazilabilir()
         var v = veri
-        let d = try islem(&v)
-        for id in d.kumesler { if let k = v.kumes(id) { try await kumesYaz(k) } }
-        for id in d.uniteler { if let u = v.unite(id) { try await uniteYaz(u) } }
-        veri = v
-    }
-
-    private func kumesYaz(_ k: Kumes) async throws {
-        try await supabase.from("kumesler").update(k.satir, returning: .minimal).eq("id", value: k.id).execute()
-    }
-
-    private func uniteYaz(_ u: Unite) async throws {
-        try await supabase.from("civciv_uniteleri").update(u.satir, returning: .minimal).eq("id", value: u.id).execute()
-    }
-
-    private func ekle(_ tablo: String, _ satir: JSONNesne) async throws -> String {
-        var s = satir
-        s["user_id"] = .metin(kullanici ?? "")
-        let r: JSONNesne = try await supabase.from(tablo).insert(s, returning: .representation)
-            .select().single().execute().value
-        guard let id = r.metin("id") else { throw KuralHatasi("Kayıt oluşturulamadı.") }
-        return id
-    }
-
-    private func guncelle(_ tablo: String, _ id: String, _ satir: JSONNesne) async throws {
-        try await supabase.from(tablo).update(satir, returning: .minimal).eq("id", value: id).execute()
-    }
-
-    private func sil(_ tablo: String, _ id: String) async throws {
-        try await supabase.from(tablo).delete(returning: .minimal).eq("id", value: id).execute()
+        _ = try islem(&v)
+        try await atomikKaydet(v)
     }
 
     // MARK: Kümes
 
     func kumesKaydet(_ k: Kumes) async throws {
         try yazilabilir()
+        var v = veri
         var k = k
-        if k.id.isEmpty {
-            k.id = try await ekle("kumesler", k.satir)
-            veri.kumesler.append(k)
-        } else {
-            // hareketler kayıtlı halinden korunur (form yalnız ad/tür/ırk/not düzenler)
-            if let eski = veri.kumes(k.id) { k.hareketler = eski.hareketler }
-            try await kumesYaz(k)
-            if let i = veri.kumesler.firstIndex(where: { $0.id == k.id }) { veri.kumesler[i] = k }
-        }
+        if k.id.isEmpty { k.id = kaliciKimlik(); v.kumesler.append(k) }
+        else if let i = v.kumesler.firstIndex(where: { $0.id == k.id }) {
+            k.hareketler = v.kumesler[i].hareketler
+            v.kumesler[i] = k
+        } else { throw KuralHatasi("Kümes bulunamadı.") }
+        try await atomikKaydet(v)
     }
 
     func kumesSil(_ id: String) async throws {
-        try yazilabilir()
-        try await sil("kumesler", id)
-        veri.kumesler.removeAll { $0.id == id }
+        var v = veri
+        v.kumesler.removeAll { $0.id == id }
+        try await atomikKaydet(v)
     }
 
     func hayvanIslemi(kumesId: String, islem: Islem, irkId: String?, erkek: Int, disi: Int, not: String, dogum: String?) async throws {
@@ -155,12 +237,13 @@ final class Depo {
 
     @discardableResult
     func uniteEkle(ad: String, tip: UniteTipi, adet: Int, tarih: String) async throws -> String {
-        try yazilabilir()
-        var u = Unite(ad: ad, tip: tip, adet: max(0, adet))
+        var v = veri
+        let id = kaliciKimlik()
+        var u = Unite(id: id, ad: ad, tip: tip, adet: max(0, adet))
         if adet > 0 { u.hareketler = [.parti(adet: adet, kaynak: "Başlangıç", not: "Başlangıç", tarih: tarih)] }
-        u.id = try await ekle("civciv_uniteleri", u.satir)
-        veri.uniteler.append(u)
-        return u.id
+        v.uniteler.append(u)
+        try await atomikKaydet(v)
+        return id
     }
 
     func uniteAdiDegistir(_ id: String, ad: String, tip: UniteTipi) async throws {
@@ -172,9 +255,9 @@ final class Depo {
     }
 
     func uniteSil(_ id: String) async throws {
-        try yazilabilir()
-        try await sil("civciv_uniteleri", id)
-        veri.uniteler.removeAll { $0.id == id }
+        var v = veri
+        v.uniteler.removeAll { $0.id == id }
+        try await atomikKaydet(v)
     }
 
     private func uniteDegistir(_ uniteId: String, _ islem: @escaping (inout Veri) throws -> Void) async throws {
@@ -213,25 +296,22 @@ final class Depo {
     // MARK: Kuluçka
 
     func kuluckaKaydet(_ k: Kulucka) async throws {
-        try yazilabilir()
+        var v = veri
         var k = k
         k.toplamYumurta = k.kaynaklar.reduce(0) { $0 + $1.adet }
-        if k.id.isEmpty {
-            k.id = try await ekle("kuluckalar", k.satir)
-            veri.kuluckalar.append(k)
-        } else {
-            if let eski = veri.kuluckalar.first(where: { $0.id == k.id }) { k.durum = eski.durum; k.cikim = eski.cikim }
-            try await guncelle("kuluckalar", k.id, k.satir)
-            if let i = veri.kuluckalar.firstIndex(where: { $0.id == k.id }) { veri.kuluckalar[i] = k }
-        }
-        yerelleriTazele()
+        if k.id.isEmpty { k.id = kaliciKimlik(); v.kuluckalar.append(k) }
+        else if let i = v.kuluckalar.firstIndex(where: { $0.id == k.id }) {
+            k.durum = v.kuluckalar[i].durum
+            k.cikim = v.kuluckalar[i].cikim
+            v.kuluckalar[i] = k
+        } else { throw KuralHatasi("Kuluçka bulunamadı.") }
+        try await atomikKaydet(v)
     }
 
     func kuluckaSil(_ id: String) async throws {
-        try yazilabilir()
-        try await sil("kuluckalar", id)
-        veri.kuluckalar.removeAll { $0.id == id }
-        yerelleriTazele()
+        var v = veri
+        v.kuluckalar.removeAll { $0.id == id }
+        try await atomikKaydet(v)
     }
 
     /// Çıkımı kaydeder; `yeniUniteAdi` doluysa önce ünite oluşturulur. Toplam civcivi döner.
@@ -240,15 +320,15 @@ final class Depo {
                      uniteId: String?, yeniUniteAdi: String?, yeniUniteTipi: UniteTipi) async throws -> (Int, String?) {
         try yazilabilir()
         var hedef = uniteId
+        var v = veri
         let toplam = satirlar.reduce(0) { $0 + $1.civciv }
         if let ad = yeniUniteAdi?.trimmingCharacters(in: .whitespaces), !ad.isEmpty, toplam > 0 {
-            hedef = try await uniteEkle(ad: ad, tip: yeniUniteTipi, adet: 0, tarih: tarih)
+            let id = kaliciKimlik()
+            v.uniteler.append(Unite(id: id, ad: ad, tip: yeniUniteTipi))
+            hedef = id
         }
-        var v = veri
         let degisen = try v.cikimKaydet(kuluckaId: kuluckaId, satirlar: satirlar, tarih: tarih, not: not, uniteId: hedef)
-        if let degisen, let u = v.unite(degisen) { try await uniteYaz(u) }
-        if let k = v.kuluckalar.first(where: { $0.id == kuluckaId }) { try await guncelle("kuluckalar", k.id, k.satir) }
-        veri = v
+        try await atomikKaydet(v)
         yerelleriTazele()
         return (toplam, degisen.flatMap { v.unite($0)?.ad })
     }
@@ -258,6 +338,7 @@ final class Depo {
     func satisKaydet(eskiId: String?, musteri: String, tarih: String, urunler: [SatisUrunu], odenen: Double?, not: String) async throws {
         try yazilabilir()
         let eski = eskiId.flatMap { id in veri.satislar.first { $0.id == id } }
+        if eskiId != nil, eski == nil { throw KuralHatasi("Satış bulunamadı. Verileri yenileyin.") }
         try veri.satisDogrula(urunler, eski: eski)
         var u = urunler
         let toplam = u.reduce(0.0) { r, x in
@@ -265,81 +346,67 @@ final class Depo {
             return r + Double(adet) * x.fiyat
         }
         let ode = odenen ?? toplam
-        guard ode >= 0 else { throw KuralHatasi("Ödenen tutar geçersiz!") }
+        guard toplam.isFinite, ode.isFinite, ode >= 0 else { throw KuralHatasi("Ödenen tutar geçersiz!") }
         guard ode <= toplam + 0.001 else {
             throw KuralHatasi("Ödenen tutar (\(para(ode))) satış toplamını (\(para(toplam))) geçemez!")
         }
         let mus = musteri.trimmingCharacters(in: .whitespaces)
         var v = veri
-        let d = v.satisUygula(&u, eski: eski, musteri: mus, tarih: tarih)
-        for id in d.kumesler { if let k = v.kumes(id) { try await kumesYaz(k) } }
-        for id in d.uniteler { if let x = v.unite(id) { try await uniteYaz(x) } }
+        _ = v.satisUygula(&u, eski: eski, musteri: mus, tarih: tarih)
         let n = not.trimmingCharacters(in: .whitespaces)
-        var s = Satis(id: eski?.id ?? "", musteri: mus.isEmpty ? nil : mus, tarih: tarih, urunler: u,
+        let s = Satis(id: eski?.id ?? kaliciKimlik(), musteri: mus.isEmpty ? nil : mus, tarih: tarih, urunler: u,
                       toplam: toplam, odenen: min(ode, toplam), not: n.isEmpty ? nil : n)
         if let eski {
-            try await guncelle("satislar", eski.id, s.satir)
             if let i = v.satislar.firstIndex(where: { $0.id == eski.id }) { v.satislar[i] = s }
         } else {
-            s.id = try await ekle("satislar", s.satir)
             v.satislar.insert(s, at: 0)
         }
-        veri = v
+        try await atomikKaydet(v)
     }
 
     func satisSil(_ id: String) async throws {
         try yazilabilir()
         guard let s = veri.satislar.first(where: { $0.id == id }) else { return }
         var v = veri
-        let d = v.satisStokIade(s, notOnEk: "Satış iptali")
-        for kid in d.kumesler { if let k = v.kumes(kid) { try await kumesYaz(k) } }
-        for uid in d.uniteler { if let u = v.unite(uid) { try await uniteYaz(u) } }
-        try await sil("satislar", id)
+        _ = v.satisStokIade(s, notOnEk: "Satış iptali")
         v.satislar.removeAll { $0.id == id }
-        veri = v
+        try await atomikKaydet(v)
     }
 
     /// Kalan alacağı tahsil edildi say (web `satisBorcAl`).
     func tahsilEt(_ id: String) async throws {
-        try yazilabilir()
-        guard var s = veri.satislar.first(where: { $0.id == id }) else { return }
-        s.odenen = s.toplam
-        try await guncelle("satislar", id, s.satir)
-        if let i = veri.satislar.firstIndex(where: { $0.id == id }) { veri.satislar[i] = s }
+        var v = veri
+        guard let i = v.satislar.firstIndex(where: { $0.id == id }) else { return }
+        v.satislar[i].odenen = v.satislar[i].toplam
+        try await atomikKaydet(v)
     }
 
     // MARK: Gider
 
     func giderKaydet(_ g: Gider) async throws {
-        try yazilabilir()
-        guard g.tutar > 0 else { throw KuralHatasi("Geçerli tutar girin!") }
-        guard g.odenen >= 0 else { throw KuralHatasi("Ödenen tutar geçersiz!") }
-        guard g.odenen <= g.tutar + 0.001 else {
-            throw KuralHatasi("Ödenen tutar (\(para(g.odenen))) gider tutarını (\(para(g.tutar))) geçemez!")
+        guard g.tutar.isFinite, g.tutar > 0, g.odenen.isFinite, g.odenen >= 0, g.odenen <= g.tutar + 0.001 else {
+            throw KuralHatasi("Gider ve ödenen tutarı kontrol edin.")
         }
+        var v = veri
         var g = g
         g.odenen = min(g.odenen, g.tutar)
-        if g.id.isEmpty {
-            g.id = try await ekle("giderler", g.satir)
-            veri.giderler.insert(g, at: 0)
-        } else {
-            try await guncelle("giderler", g.id, g.satir)
-            if let i = veri.giderler.firstIndex(where: { $0.id == g.id }) { veri.giderler[i] = g }
-        }
+        if g.id.isEmpty { g.id = kaliciKimlik(); v.giderler.insert(g, at: 0) }
+        else if let i = v.giderler.firstIndex(where: { $0.id == g.id }) { v.giderler[i] = g }
+        else { throw KuralHatasi("Gider bulunamadı.") }
+        try await atomikKaydet(v)
     }
 
     func giderSil(_ id: String) async throws {
-        try yazilabilir()
-        try await sil("giderler", id)
-        veri.giderler.removeAll { $0.id == id }
+        var v = veri
+        v.giderler.removeAll { $0.id == id }
+        try await atomikKaydet(v)
     }
 
     func borcOde(_ id: String) async throws {
-        try yazilabilir()
-        guard var g = veri.giderler.first(where: { $0.id == id }) else { return }
-        g.odenen = g.tutar
-        try await guncelle("giderler", id, g.satir)
-        if let i = veri.giderler.firstIndex(where: { $0.id == id }) { veri.giderler[i] = g }
+        var v = veri
+        guard let i = v.giderler.firstIndex(where: { $0.id == id }) else { return }
+        v.giderler[i].odenen = v.giderler[i].tutar
+        try await atomikKaydet(v)
     }
 
     // MARK: Sezon arşivi
@@ -347,11 +414,11 @@ final class Depo {
     func sezonlariYukle() async {
         guard let uid = kullanici else { return }
         do {
-            let r: [JSONNesne] = try await supabase.from("sezonlar").select("id, ad, tarih, veri").eq("user_id", value: uid)
-                .order("created_at", ascending: false).execute().value
+            let r = try await liste("sezonlar", uid: uid)
+            guard uid == kullanici else { return }
             sezonlar = r.map(Sezon.init(satir:))
         } catch {
-            sezonlar = []
+            hata = "Sezon arşivleri yüklenemedi. Lütfen tekrar deneyin."
         }
     }
 
@@ -361,7 +428,6 @@ final class Depo {
     }
 
     func canliyaDon() async {
-        arsiv = nil
         await yukle()
     }
 
@@ -371,158 +437,65 @@ final class Depo {
         sezonlar.removeAll { $0.id == id }
     }
 
-    private func arsivle(ad: String) async throws {
-        guard let uid = kullanici else { throw KuralHatasi("Oturum bulunamadı.") }
-        let satir: JSONNesne = ["id": .metin(yeniKimlik()), "user_id": .metin(uid), "ad": .metin(ad),
-                                "tarih": .metin(Gun.bugun), "veri": .nesne(veri.bellek)]
-        try await supabase.from("sezonlar").insert(satir, returning: .minimal).execute()
-    }
-
     // MARK: Yedekten geri yükleme
 
-    private func kimlikler(_ tablo: String, _ uid: String) async throws -> [String] {
-        let r: [JSONNesne] = try await supabase.from(tablo).select("id").eq("user_id", value: uid).execute().value
-        return r.compactMap { $0.metin("id") }
-    }
-
-    private func topluEkle(_ tablo: String, _ satirlar: [JSONNesne], _ uid: String) async throws -> [String] {
-        var idler: [String] = []
-        var i = 0
-        while i < satirlar.count {
-            let parca = satirlar[i..<min(i + 200, satirlar.count)].map { s -> JSONNesne in
-                var s = s; s["user_id"] = .metin(uid); return s
-            }
-            let r: [JSONNesne] = try await supabase.from(tablo).insert(Array(parca), returning: .representation)
-                .select("id").execute().value
-            idler += r.compactMap { $0.metin("id") }
-            i += 200
-        }
-        return idler
-    }
-
-    private func idIleSil(_ tablo: String, _ idler: [String]) async throws {
-        var i = 0
-        while i < idler.count {
-            let parca = Array(idler[i..<min(i + 100, idler.count)])
-            try await supabase.from(tablo).delete(returning: .minimal).in("id", values: parca).execute()
-            i += 100
-        }
-    }
-
-    /// JSON yedeğini geri yükler (web `yedekYukle`). Web'den farkı, veri kaybına karşı:
-    ///  1) mevcut canlı veri önce "Yedek öncesi …" adıyla sezon arşivine alınır,
-    ///  2) yedek satırları ÖNCE eklenir, eski satırlar ancak hepsi eklendikten sonra silinir
-    ///     (ekleme yarıda kalırsa eklenenler geri alınır, mevcut veri olduğu gibi kalır),
-    ///  3) sezon arşivi silinmez; yedekteki arşivlerden olmayanlar eklenir.
-    /// Eklenen kayıt sayısını döner.
     func yedekYukle(_ y: Yedek) async throws -> Int {
         try yazilabilir()
-        guard let uid = kullanici else { throw KuralHatasi("Oturum bulunamadı.") }
-
-        do { try await arsivle(ad: "Yedek öncesi " + Gun.goster(Date())) } catch {
-            throw KuralHatasi("Mevcut veriler arşive kaydedilemedi, hiçbir şey değiştirilmedi.\n\(error.localizedDescription)")
-        }
-
-        let tablolar = ["giderler", "satislar", "kuluckalar", "civciv_uniteleri", "kumesler"]
-        var eski: [String: [String]] = [:]
-        for t in tablolar { eski[t] = try await kimlikler(t, uid) }
-
         var v = y.veri
-        var eklenen: [(String, String)] = []
-        do {
-            var km: [String: String] = [:]
-            for i in v.kumesler.indices {
-                let yeni = try await ekle("kumesler", v.kumesler[i].satir)
-                eklenen.append(("kumesler", yeni))
-                km[v.kumesler[i].id] = yeni
-            }
-            v.kumesKimlikleriniEsle(km)
-
-            var um: [String: String] = [:]
-            if v.uniteler.isEmpty { v.uniteler = [Unite(ad: "Genel Civciv Ünitesi", tip: .civciv)] }
-            for i in v.uniteler.indices {
-                let yeni = try await ekle("civciv_uniteleri", v.uniteler[i].satir)
-                eklenen.append(("civciv_uniteleri", yeni))
-                um[v.uniteler[i].id] = yeni
-            }
-            v.uniteKimlikleriniEsle(um)
-
-            for (t, satirlar) in [("kuluckalar", v.kuluckalar.map(\.satir)), ("satislar", v.satislar.map(\.satir)),
-                                  ("giderler", v.giderler.map(\.satir))] {
-                for id in try await topluEkle(t, satirlar, uid) { eklenen.append((t, id)) }
-            }
-        } catch {
-            // Yarım kalan yüklemeyi geri al: önce bağımlı tablolar
-            for t in tablolar {
-                let ids = eklenen.filter { $0.0 == t }.map(\.1)
-                if !ids.isEmpty { try? await idIleSil(t, ids) }
-            }
-            throw KuralHatasi("Yedek yüklenemedi, mevcut verilere dokunulmadı.\n\(error.localizedDescription)")
+        var km: [String: String] = [:]
+        for i in v.kumesler.indices {
+            let eski = v.kumesler[i].id
+            let yeni = kaliciKimlik()
+            km[eski] = yeni
+            v.kumesler[i].id = yeni
         }
-
-        var silinemeyen = false
-        for t in tablolar {
-            do { try await idIleSil(t, eski[t] ?? []) } catch { silinemeyen = true }
+        v.kumesKimlikleriniEsle(km)
+        if v.uniteler.isEmpty { v.uniteler = [Unite(ad: "Genel Civciv Ünitesi", tip: .civciv)] }
+        var um: [String: String] = [:]
+        for i in v.uniteler.indices {
+            let eski = v.uniteler[i].id
+            let yeni = kaliciKimlik()
+            um[eski] = yeni
+            v.uniteler[i].id = yeni
         }
-
-        // Sezon arşivi: yalnız eksik olanlar eklenir
+        v.uniteKimlikleriniEsle(um)
+        for i in v.kuluckalar.indices { v.kuluckalar[i].id = kaliciKimlik() }
+        for i in v.satislar.indices { v.satislar[i].id = kaliciKimlik() }
+        for i in v.giderler.indices { v.giderler[i].id = kaliciKimlik() }
         await sezonlariYukle()
-        let varOlan = Set(sezonlar.map(\.id))
-        for s in y.sezonlar where !varOlan.contains(s.metin("id") ?? "") {
-            var satir: JSONNesne = ["id": s["id"] ?? .metin(yeniKimlik()), "user_id": .metin(uid),
-                                    "ad": .metin(s.metin("ad") ?? "Sezon"), "tarih": .metin(s.metin("tarih") ?? Gun.bugun)]
-            satir["veri"] = s["veri"] ?? .nesne([:])
-            try? await supabase.from("sezonlar").insert(satir, returning: .minimal).execute()
+        let mevcut = Set(sezonlar.map(\.id))
+        var ek = [arsivIslemi(ad: "Yedek öncesi " + Gun.goster(Date()))]
+        for s in y.sezonlar where !mevcut.contains(s.metin("id") ?? "") {
+            let id = s.doluMetin("id") ?? kaliciKimlik()
+            ek.append(["tablo": .metin("sezonlar"), "tur": .metin("ekle"), "id": .metin(id),
+                       "veri": .nesne(["ad": s["ad"] ?? .metin("Sezon"), "tarih": s["tarih"] ?? .metin(Gun.bugun),
+                                       "veri": s["veri"] ?? .nesne([:])])])
         }
-
-        await yukle()
+        try await atomikKaydet(v, ek: ek)
         await sezonlariYukle()
-        if silinemeyen {
-            throw KuralHatasi("Yedek yüklendi ama eski kayıtların bir kısmı silinemedi; çift görünen kayıt olabilir. İnterneti kontrol edip uygulamayı yenileyin.")
-        }
         return y.kayitSayisi
     }
 
     /// Yeni sezon (web `yeniSezonOlustur`): arşivle, satış/gider ve tamamlanmış kuluçkaları sil.
     func yeniSezon(ad: String) async throws {
         try yazilabilir()
-        guard let uid = kullanici else { return }
-        try await arsivle(ad: ad)
-        do {
-            try await supabase.from("satislar").delete(returning: .minimal).eq("user_id", value: uid).execute()
-            try await supabase.from("giderler").delete(returning: .minimal).eq("user_id", value: uid).execute()
-        } catch {
-            throw KuralHatasi("Arşiv kaydedildi ama satış/giderler silinemedi: \(error.localizedDescription)")
-        }
-        for k in veri.biten { try await sil("kuluckalar", k.id) }
-        await yukle()
+        var v = veri
+        v.satislar = []
+        v.giderler = []
+        v.kuluckalar.removeAll { $0.tamamlandi }
+        try await atomikKaydet(v, ek: [arsivIslemi(ad: ad)])
     }
 
-    /// Yıl sonu (web `yeniDonemeGec`): önce arşiv, sonra devredenler eklenir, eski kayıtlar id ile silinir.
     func yilSonu(alacakDevret: Bool, borcDevret: Bool, bitenKuluckalariSil: Bool) async throws -> String {
         try yazilabilir()
-        do { try await arsivle(ad: "Yıl Sonu " + Gun.goster(Date())) } catch {
-            throw KuralHatasi("Arşiv kaydedilemedi, hiçbir şey silinmedi: \(error.localizedDescription)")
-        }
+        var v = veri
         let dev = veri.devredenler(alacak: alacakDevret, borc: borcDevret)
-        let eskiS = veri.satislar.map(\.id), eskiG = veri.giderler.map(\.id)
-        var silinenKulucka = 0
-        if bitenKuluckalariSil {
-            for k in veri.biten { try await sil("kuluckalar", k.id); silinenKulucka += 1 }
-        }
-        for s in dev.satislar { _ = try await ekle("satislar", s.satir) }
-        for g in dev.giderler { _ = try await ekle("giderler", g.satir) }
-        if !eskiS.isEmpty {
-            try await supabase.from("satislar").delete(returning: .minimal).in("id", values: eskiS).execute()
-        }
-        if !eskiG.isEmpty {
-            try await supabase.from("giderler").delete(returning: .minimal).in("id", values: eskiG).execute()
-        }
-        await yukle()
-        var m = "Kümesler ve hayvanlar korundu."
-        if silinenKulucka > 0 { m += "\n\(silinenKulucka) tamamlanmış kuluçka silindi." }
-        if !dev.satislar.isEmpty { m += "\n\(dev.satislar.count) alacak aktarıldı." }
-        if !dev.giderler.isEmpty { m += "\n\(dev.giderler.count) borç aktarıldı." }
-        return m
+        v.satislar = dev.satislar
+        v.giderler = dev.giderler
+        for i in v.satislar.indices { v.satislar[i].id = kaliciKimlik() }
+        for i in v.giderler.indices { v.giderler[i].id = kaliciKimlik() }
+        if bitenKuluckalariSil { v.kuluckalar.removeAll { $0.tamamlandi } }
+        try await atomikKaydet(v, ek: [arsivIslemi(ad: "Yıl Sonu " + Gun.goster(Date()))])
+        return "Yeni döneme geçildi. Önceki veriler sezon arşivine kaydedildi."
     }
 }

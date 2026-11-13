@@ -2,6 +2,15 @@ import XCTest
 @testable import KumesCekirdek
 
 final class GeriYukleTests: XCTestCase {
+    func testGecersizListeCanliVerininYeriniAlamaz() throws {
+        for json in [#"{"kumesler":null}"#, #"{"kumesler":{}}"#,
+                     #"{"kumesler":[12]}"#, #"{"kumesler":[],"satislar":null}"#,
+                     #"{"veri":{"kumesler":[]},"sezonArsivi":{}}"#] {
+            XCTAssertThrowsError(try Yedek(dosya: Data(json.utf8)))
+        }
+        XCTAssertEqual(try Yedek(dosya: Data(#"{"kumesler":[]}"#.utf8)).kayitSayisi, 0)
+    }
+
     func testYeniVeEskiBicim() throws {
         let yeni = #"{"versiyon":"5.0-cloud","tarih":"2026-11-03T10:00:00.000Z","veri":{"kumesler":[{"id":"k1","ad":"<A>","irklar":[]}],"civcivUniteleri":[{"id":"u1","ad":"Y","tip":"yavru_guvercin","adet":0,"hareketler":[]}]},"sezonArsivi":[{"ad":"S","tarih":"2026-01-01","veri":{}}]}"#
         let y = try Yedek(dosya: Data(yeni.utf8), bugun: "2026-11-04")

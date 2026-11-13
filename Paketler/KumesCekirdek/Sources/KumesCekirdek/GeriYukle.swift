@@ -25,6 +25,18 @@ public struct Yedek: Sendable {
         if let v = kok["veri"]?.nesne, v["kumesler"] != nil { ham = v }
         else if let v = kok.nesne, v["kumesler"] != nil { ham = v }
         else { throw KuralHatasi("Geçersiz yedek dosyası!\nKümes verisi bulunamadı.") }
+        // Eski yedeklerde bazı listeler eksik olabilir. Var olan her liste ve satır geçerli olmalı.
+        for anahtar in ["kumesler", "kuluckalar", "civcivUniteleri", "satislar", "giderler"] {
+            guard let deger = ham[anahtar] else { continue }
+            guard let liste = deger.dizi, liste.allSatisfy({ $0.nesne != nil }) else {
+                throw KuralHatasi("Geçersiz yedek dosyası!\n\(anahtar) bir kayıt listesi olmalı.")
+            }
+        }
+        if let sezonlar = kok["sezonArsivi"] {
+            guard let liste = sezonlar.dizi, liste.allSatisfy({ $0.nesne != nil }) else {
+                throw KuralHatasi("Geçersiz yedek dosyası!\nSezon arşivi bir kayıt listesi olmalı.")
+            }
+        }
         ham = metinTemizle(.nesne(ham)).nesne ?? [:]
 
         var v = Veri(bellek: ham)
