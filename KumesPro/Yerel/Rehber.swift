@@ -1,29 +1,56 @@
 import SwiftUI
 import ContactsUI
 
-/// Sistem seçicisi yalnız kullanıcının seçtiği kişiyi verir; tüm rehber okunmaz.
+/// UIKit seçicisi kendi penceresini kapatır; satış formunun SwiftUI sheet'ine dokunmaz.
 struct RehberSecici: UIViewControllerRepresentable {
+    @Binding var acik: Bool
     let sec: (String) -> Void
-    let vazgec: () -> Void
 
-    func makeCoordinator() -> Koordinator { Koordinator(sec: sec, vazgec: vazgec) }
-    func makeUIViewController(context: Context) -> CNContactPickerViewController {
-        let picker = CNContactPickerViewController()
-        picker.delegate = context.coordinator
-        picker.predicateForSelectionOfContact = NSPredicate(value: true)
-        return picker
+    func makeUIViewController(context: Context) -> RehberSunucusu { RehberSunucusu() }
+    func updateUIViewController(_ controller: RehberSunucusu, context: Context) {
+        controller.sec = { ad in acik = false; sec(ad) }
+        controller.vazgec = { acik = false }
+        controller.acik = acik
+        controller.sunmayiDene()
     }
-    func updateUIViewController(_ controller: CNContactPickerViewController, context: Context) {}
+}
 
-    final class Koordinator: NSObject, CNContactPickerDelegate {
-        let sec: (String) -> Void
-        let vazgec: () -> Void
-        init(sec: @escaping (String) -> Void, vazgec: @escaping () -> Void) { self.sec = sec; self.vazgec = vazgec }
-        func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
-            var ad = CNContactFormatter.string(from: contact, style: .fullName)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if ad.isEmpty, contact.isKeyAvailable(CNContactOrganizationNameKey) { ad = contact.organizationName.trimmingCharacters(in: .whitespacesAndNewlines) }
-            sec(ad)
+final class RehberSunucusu: UIViewController, CNContactPickerDelegate {
+    var acik = false
+    var sec: (String) -> Void = { _ in }
+    var vazgec: () -> Void = {}
+    private var secici: CNContactPickerViewController?
+
+    override func viewDidLoad() { super.viewDidLoad(); view.backgroundColor = .clear }
+    override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); sunmayiDene() }
+
+    func sunmayiDene() {
+        guard acik, secici == nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.acik, self.secici == nil, self.view.window != nil,
+                  self.presentedViewController == nil else { return }
+            let picker = CNContactPickerViewController()
+            picker.delegate = self
+            picker.predicateForSelectionOfContact = NSPredicate(value: true)
+            self.secici = picker
+            self.present(picker, animated: true)
         }
-        func contactPickerDidCancel(_ picker: CNContactPickerViewController) { vazgec() }
+    }
+
+    func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
+        var ad = CNContactFormatter.string(from: contact, style: .fullName)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if ad.isEmpty, contact.isKeyAvailable(CNContactOrganizationNameKey) {
+            ad = contact.organizationName.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // Seçici kendi sunumunu kapatır; üstteki satış formuna dismiss gönderilmez.
+        acik = false
+        secici = nil
+        sec(ad)
+    }
+
+    func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
+        acik = false
+        secici = nil
+        vazgec()
     }
 }

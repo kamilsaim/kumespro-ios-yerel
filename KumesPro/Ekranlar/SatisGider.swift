@@ -86,12 +86,11 @@ struct SatisFormu: View {
             } message: { Text("Satılan hayvan/civcivler ilgili kümes/üniteye geri eklenir.") }
         }
         .interactiveDismissDisabled(calisiyor)
-        .sheet(isPresented: $rehberAcik) {
-            RehberSecici(sec: { ad in
-                rehberAcik = false
+        .background {
+            RehberSecici(acik: $rehberAcik, sec: { ad in
                 if ad.isEmpty { gezinti.goster(KuralHatasi("Seçilen kişinin adı bulunamadı.")) }
                 else { musteri = ad }
-            }, vazgec: { rehberAcik = false })
+            }).frame(width: 0, height: 0)
         }
     }
 
