@@ -77,7 +77,7 @@ begin
       beklenen := op->'beklenen';
       if mevcut is null or beklenen is null or jsonb_typeof(beklenen) <> 'object'
          or beklenen = '{}'::jsonb or not (mevcut @> beklenen) then
-        raise exception 'Kayıt başka cihazda değişti. Verileri yenileyip tekrar deneyin.' using errcode = '40001';
+        raise exception 'Kayıt başka cihazda değişti. Verileri yenileyip tekrar deneyin.' using errcode = 'PT409';
       end if;
     end if;
     if tur = 'sil' then
