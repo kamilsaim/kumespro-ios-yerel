@@ -1,5 +1,8 @@
 name: iOS derleme kontrolu
 on:
+  push:
+    branches: [codex/ios-dogrulama-20261113]
+    paths: [.github/workflows/ios-testflight.yml]
   workflow_dispatch:
 jobs:
   derleme:
