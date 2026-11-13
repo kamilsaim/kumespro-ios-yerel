@@ -49,7 +49,7 @@ final class Depo {
             try FileManager.default.removeItem(at: dosya)
         } catch let e as PostgrestError {
             // PostgreSQL bu hatalarda transaction'ı geri almıştır.
-            if ["40001", "PGRST202", "42501", "23503", "23514", "P0001", "22023"].contains(e.code ?? "") {
+            if ["40001", "PT409", "PGRST202", "42501", "23503", "23514", "P0001", "22023"].contains(e.code ?? "") {
                 try FileManager.default.removeItem(at: dosya)
             }
             throw e

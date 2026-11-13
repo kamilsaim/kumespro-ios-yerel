@@ -42,7 +42,7 @@ begin
     perform public.kp_atomik_islem(gen_random_uuid(),
       jsonb_build_array(jsonb_build_object('tablo','kumesler','tur','guncelle','id',kid,
         'veri',jsonb_build_object('ad','Eski cihaz'), 'beklenen',jsonb_build_object('ad','Farklı değer'))),uid);
-  exception when serialization_failure then hata := true;
+  exception when sqlstate 'PT409' then hata := true;
   end;
   if not hata then raise exception 'TEST BAŞARISIZ: eski veriyle yazma kabul edildi'; end if;
 
